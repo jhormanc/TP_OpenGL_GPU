@@ -1,0 +1,10 @@
+#version 430
+
+out vec4 color_out;
+
+layout(location = 3) uniform float v;
+
+void main()
+{
+	color_out = vec4(v, 1 - v, 1 - v, 1);
+}
