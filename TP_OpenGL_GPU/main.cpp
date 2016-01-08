@@ -6,11 +6,12 @@
 #include <string.h>
 #include <process.h>
 #include <stdio.h>
+#include <regex>
 
-#include <GL/glew.h>
+#include <GL\glew.h>
 
-#include <GLFW/glfw3.h>
-#include <GL/gl.h>
+#include <GLFW\glfw3.h>
+#include <GL\GL.h>
 
 #include <glm\glm\glm.hpp>
 #include <glm\glm\gtx\transform.hpp>
@@ -25,6 +26,10 @@ void init();
 
 #define glInfo(a) std::cout << #a << ": " << glGetString(a) << std::endl
 
+std::regex obj_regex1("f [0-9]+// [0-9]+// [0-9]+//(.*)");
+std::regex obj_regex2("f [0-9]+//[0-9]+ [0-9]+//[0-9]+ [0-9]+//[0-9]+(.*)");
+std::regex obj_regex3("f [0-9]+/[0-9]+/[0-9]+ [0-9]+/[0-9]+/[0-9]+ [0-9]+/[0-9]+/[0-9]+[\\r\\n]*");
+
 // This function is called on any openGL API error
 void APIENTRY debug(GLenum, // source
 	GLenum, // type
@@ -37,52 +42,52 @@ void APIENTRY debug(GLenum, // source
 	std::cout << "DEBUG: " << message << std::endl;
 }
 
-bool load_obj(const char* filename, vector<glm::vec3> &vertices, vector<glm::vec2> &textures, vector<glm::vec3> &normals, vector<GLushort> &verticesIndex, vector<GLushort> &texturesIndex, vector<GLushort> &normalsIndex)
+bool load_obj(const char* filename, vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<glm::vec3> &normals, vector<GLushort> &verticesIndex, vector<GLushort> &texturesIndex, vector<GLushort> &normalsIndex)
 {
 	FILE *file;
 	fopen_s(&file, filename, "r");
+
 	if (file == NULL)
 	{
 		printf("Impossible to open the file !\n");
 		return false;
 	}
 
-	while (1)
+	std::vector<glm::vec4> temp_vertices;
+	std::vector<glm::vec2> temp_uvs;
+	std::vector<glm::vec3> temp_normals;
+
+	while (!feof(file))
 	{
-		char lineHeader[128];
-		
-		// read the first word of the line
-		int res = fscanf_s(file, "%s", lineHeader, sizeof(lineHeader));
-		if (res == EOF)
-			break; // EOF = End Of File. Quit the loop.
-		else
+		char line[255];
+
+		fgets(line, 255, file);
+
+		if (strncmp(line, "v ", 2) == 0)
 		{
-			if (strcmp(lineHeader, "v") == 0)
+			glm::vec3 vertex;
+			sscanf_s(line, "v %f %f %f\n", &vertex.x, &vertex.y, &vertex.z);
+			temp_vertices.push_back(glm::vec4(vertex.x, vertex.y, vertex.z, 1.f));
+		}
+		else if (strncmp(line, "vt", 2) == 0)
+		{
+			glm::vec2 uv;
+			sscanf_s(line, "vt %f %f\n", &uv.x, &uv.y);
+			temp_uvs.push_back(uv);
+		}
+		else if (strncmp(line, "vn", 2) == 0)
+		{
+			glm::vec3 normal;
+			sscanf_s(line, "vn %f %f %f\n", &normal.x, &normal.y, &normal.z);
+			temp_normals.push_back(normal);
+		}
+		else if (strncmp(line, "f ", 2) == 0)
+		{
+			GLushort *vertexIndex = new GLushort[3], *uvIndex = new GLushort[3], *normalIndex = new GLushort[3];
+
+			if (std::regex_match(line, obj_regex3))
 			{
-				glm::vec3 vertex;
-				fscanf_s(file, "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z);
-				vertices.push_back(vertex);
-			}
-			else if (strcmp(lineHeader, "vt") == 0)
-			{
-				glm::vec2 uv;
-				fscanf_s(file, "%f %f\n", &uv.x, &uv.y);
-				textures.push_back(uv);
-			}
-			else if (strcmp(lineHeader, "vn") == 0)
-			{
-				glm::vec3 normal;
-				fscanf_s(file, "%f %f %f\n", &normal.x, &normal.y, &normal.z);
-				normals.push_back(normal);
-			}
-			else if (strcmp(lineHeader, "f") == 0)
-			{
-				std::string vertex1, vertex2, vertex3;
-				GLushort vertexIndex[3], uvIndex[3], normalIndex[3];
-				vertexIndex[0] = 0;
-				vertexIndex[1] = 0;
-				vertexIndex[2] = 0;
-				int matches = fscanf_s(file, "%d/%d/%d %d/%d/%d %d/%d/%d\n", &vertexIndex[0], &uvIndex[0], &normalIndex[0], &vertexIndex[1], &uvIndex[1], &normalIndex[1], &vertexIndex[2], &uvIndex[2], &normalIndex[2]);
+				int matches = sscanf_s(line, "f %d/%d/%d %d/%d/%d %d/%d/%d\n", &vertexIndex[0], &uvIndex[0], &normalIndex[0], &vertexIndex[1], &uvIndex[1], &normalIndex[1], &vertexIndex[2], &uvIndex[2], &normalIndex[2]);
 				if (matches == 9)
 				{
 					verticesIndex.push_back(vertexIndex[0]);
@@ -95,29 +100,92 @@ bool load_obj(const char* filename, vector<glm::vec3> &vertices, vector<glm::vec
 					normalsIndex.push_back(normalIndex[1]);
 					normalsIndex.push_back(normalIndex[2]);
 				}
-				else
+			}
+			else if (std::regex_match(line, obj_regex2))
+			{
+				int matches = sscanf_s(line, "f %d//%d %d//%d %d//%d\n", &vertexIndex[0], &normalIndex[0], &vertexIndex[1], &normalIndex[1], &vertexIndex[2], &normalIndex[2]);
+				if (matches == 6)
 				{
-					matches = fscanf_s(file, "%d//%d %d//%d %d//%d\n", &vertexIndex[0], &normalIndex[0], &vertexIndex[1], &normalIndex[1], &vertexIndex[2], &normalIndex[2]);
-					if (matches == 6)
-					{
-						verticesIndex.push_back(vertexIndex[0]);
-						verticesIndex.push_back(vertexIndex[1]);
-						verticesIndex.push_back(vertexIndex[2]);
-						normalsIndex.push_back(normalIndex[0]);
-						normalsIndex.push_back(normalIndex[1]);
-						normalsIndex.push_back(normalIndex[2]);
-					}
-					else
-					{
-						matches = fscanf_s(file, "%d// %d// %d//\n", &vertexIndex[0], &vertexIndex[1], &vertexIndex[2]);
-						if (matches == 3)
-						{
-							verticesIndex.push_back(vertexIndex[0]);
-							verticesIndex.push_back(vertexIndex[1]);
-							verticesIndex.push_back(vertexIndex[2]);
-						}
-					}
+					verticesIndex.push_back(vertexIndex[0]);
+					verticesIndex.push_back(vertexIndex[1]);
+					verticesIndex.push_back(vertexIndex[2]);
+					normalsIndex.push_back(normalIndex[0]);
+					normalsIndex.push_back(normalIndex[1]);
+					normalsIndex.push_back(normalIndex[2]);
 				}
+			}
+			else if (std::regex_match(line, obj_regex1))
+			{
+				int matches = sscanf_s(line, "f %d// %d// %d//\n", &vertexIndex[0], &vertexIndex[1], &vertexIndex[2]);
+				if (matches == 3)
+				{
+					verticesIndex.push_back(vertexIndex[0]);
+					verticesIndex.push_back(vertexIndex[1]);
+					verticesIndex.push_back(vertexIndex[2]);
+				}
+			}
+		}
+	}
+
+	if (temp_vertices.size() > 0)
+	{
+		if (verticesIndex.size() > 0)
+		{
+			for (unsigned int i = 0; i < verticesIndex.size(); i++)
+			{
+				unsigned int vertexIndex = verticesIndex[i];
+				glm::vec4 vertex = temp_vertices[vertexIndex - 1];
+				vertices.push_back(vertex);
+			}
+		}
+		else
+		{
+			for (unsigned int i = 0; i < temp_vertices.size(); i++)
+			{
+				glm::vec4 vertex = temp_vertices[i];
+				vertices.push_back(vertex);
+			}
+		}
+	}
+
+	if (temp_uvs.size() > 0)
+	{
+		if (texturesIndex.size() > 0)
+		{
+			for (unsigned int i = 0; i < texturesIndex.size(); i++)
+			{
+				unsigned int uvIndex = texturesIndex[i];
+				glm::vec2 uv = temp_uvs[uvIndex - 1];
+				textures.push_back(uv);
+			}
+		}
+		else
+		{
+			for (unsigned int i = 0; i < temp_uvs.size(); i++)
+			{
+				glm::vec2 uv = temp_uvs[i];
+				textures.push_back(uv);
+			}
+		}
+	}
+
+	if (temp_normals.size() > 0)
+	{
+		if (normalsIndex.size() > 0)
+		{
+			for (unsigned int i = 0; i < normalsIndex.size(); i++)
+			{
+				unsigned int normalIndex = normalsIndex[i];
+				glm::vec3 normal = temp_normals[normalIndex - 1];
+				normals.push_back(normal);
+			}
+		}
+		else
+		{
+			for (unsigned int i = 0; i < temp_normals.size(); i++)
+			{
+				glm::vec3 normal = temp_normals[i];
+				normals.push_back(normal);
 			}
 		}
 	}
@@ -125,7 +193,7 @@ bool load_obj(const char* filename, vector<glm::vec3> &vertices, vector<glm::vec
 	if (normals.size() == 0 && verticesIndex.size() > 0)
 	{
 		normals.resize(vertices.size(), glm::vec3(0.0, 0.0, 0.0));
-		for (int i = 0; i < verticesIndex.size(); i += 3)
+		for (unsigned int i = 0; i < verticesIndex.size(); i += 3)
 		{
 			GLushort ia = verticesIndex[i];
 			GLushort ib = verticesIndex[i + 1];
@@ -137,6 +205,8 @@ bool load_obj(const char* filename, vector<glm::vec3> &vertices, vector<glm::vec
 		}
 	}
 
+	fflush(file);
+	
 	return true;
 }
 
@@ -297,8 +367,10 @@ struct
 	clock_t start;
 	glm::vec4 p;
 	glm::vec3 camPos;
-	float near, far, fov;
+	GLfloat near, far, fov;
 	GLuint buffer;
+
+	GLfloat size;
 } gs;
 
 void init()
@@ -311,19 +383,20 @@ void init()
 
 	gs.start = clock();
 	gs.p = glm::vec4(0.f, 0.f, 0.f, 0.f);
-	gs.camPos = glm::vec3(0.f, 0.f, -1.f);
-	gs.near = 1.f;
-	gs.far = 1000.f;
-	gs.fov = 90.f;
+	gs.camPos = glm::vec3(0.f, 0.f, -5.f);
+	gs.near = 0.1f;
+	gs.far = 100.f;
+	gs.fov = 45.f;
 
-	vector<glm::vec3> vertices;
+	vector<glm::vec4> vertices;
 	vector<glm::vec2> textures;
 	vector<glm::vec3> normals;
 	vector<GLushort> verticesIndex;
 	vector<GLushort> texturesIndex;
 	vector<GLushort> normalsIndex;
-	load_obj("Cube.obj", vertices, textures, normals, verticesIndex, texturesIndex, normalsIndex);
+	load_obj("cube.obj", vertices, textures, normals, verticesIndex, texturesIndex, normalsIndex);
 
+	gs.size = vertices.size();
 	for (int i = 0; i < vertices.size(); i++)
 	{
 		std::cout << vertices[i].x << " " << vertices[i].y << " " << vertices[i].z << "\n";
@@ -333,7 +406,7 @@ void init()
 	glBindVertexArray(gs.vao);
 
 	glBindBuffer(GL_ARRAY_BUFFER, gs.buffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * vertices.size(), &vertices.front(), GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec4), &vertices[0], GL_STATIC_DRAW);
 
 	glVertexAttribPointer(11, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec4), 0);
 	//glVertexAttribPointer(12, 1, GL_FLOAT, GL_FALSE, sizeof(float) * 4, (void *)12);
@@ -357,15 +430,15 @@ void render(GLFWwindow* window)
 
 	glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
 	glm::mat4x4 m;
-	glm::mat4x4 m_persp = glm::perspective(gs.fov, (float)(WIDTH / (float)HEIGHT), gs.near, gs.far);
-	glm::mat4x4 m_look = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
-	glm::mat4x4 m_view = glm::rotate(glm::mat4(1.f), c, glm::vec3(0.f, 1.f, 0.f));
+	glm::mat4x4 projection = glm::perspective(glm::radians(gs.fov), (float)(WIDTH / (float)HEIGHT), gs.near, gs.far);
+	glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
+	glm::mat4x4 model = glm::mat4(1.0f); //glm::rotate(glm::mat4(1.f), c, glm::vec3(0.f, 1.f, 0.f));
 	//glm::mat4x4 m_view = glm::translate(glm::mat4(1.f), glm::vec3(0.5, 0.5, 0.f));
-	m = m_view * m_persp * m_look;
+	m = projection * view * model;
 	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &m[0][0]);
 
-	/*gs.camPos.x = cos(c);
-	gs.camPos.z = sin(c);*/
+	gs.camPos.x = 5.f * cos(c);
+	gs.camPos.z = 5.f * sin(c);
 	
 	/*if (gs.p.x > 1.f)
 	{
@@ -380,11 +453,11 @@ void render(GLFWwindow* window)
 	glBindVertexArray(gs.vao);
 	{
 		//glProgramUniform4f(gs.program, 1, gs.p.x, gs.p.y, gs.p.z, gs.p.w);
-		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+		glDrawArrays(GL_TRIANGLES, 0, gs.size);
 		//glDrawElements()
 
 		//glProgramUniform4f(gs.program, 1, -gs.p.x, -gs.p.y, gs.p.z, gs.p.w);
-		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+		//glDrawArrays(GL_TRIANGLES, 0, gs.size);
 	}
 
 	glBindVertexArray(0);
