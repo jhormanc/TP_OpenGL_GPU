@@ -1,9 +1,16 @@
 #version 430
 
-layout(location = 1) uniform mat4x4 m;
+layout(location = 1) uniform mat4x4 mvp;
 layout(location = 11) in vec4 pt;
+layout(location = 12) in vec3 normal;
+layout(location = 13) in vec2 uv;
+
+out vec3 normal_out;
+out vec2 uv_out;
 
 void main()
 {
-	gl_Position = m * pt;
+	uv_out = uv;
+	normal_out = normal;
+	gl_Position = mvp * pt;
 }

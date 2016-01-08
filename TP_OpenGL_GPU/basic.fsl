@@ -1,10 +1,16 @@
 #version 430
 
 out vec4 color_out;
+in vec3 normal_out;
+in vec2 uv_out;
 
 layout(location = 3) uniform float v;
+uniform sampler2D texture_sampler;
 
 void main()
 {
-	color_out = vec4(v, 1 - v, 1 - v, 1);
+	//color_out = texture(texture_sampler, uv_out).rgba;
+	color_out = abs(vec4(normal_out.x, normal_out.y, normal_out.z, 1));
+
+	//color_out = vec4(v, 1 - v, 1 - v, 1);
 }
