@@ -3,15 +3,59 @@
 out vec4 color_out;
 in vec3 normal_out;
 in vec2 uv_out;
+in vec3 position_worldspace;
+in vec3 eyeDirection_cameraspace;
+in vec3 lightDirection_cameraspace;
+in vec3 normal_cameraspace;
+in vec3 lightPos_worldspace;
 flat in int num_texture;
 
-layout(location = 3) uniform float v;
-uniform sampler2D texture_sampler[2];
+uniform sampler2D texture_sampler[3];
+vec4 light_color = vec4(1, 1, 1, 1);
+vec4 diffus = vec4(1, 1, 1, 1);
+vec4 specular = vec4(1, 1, 1, 1);
+float light_power = 10;
+float ambient_power = 0.1;
 
 void main()
 {
-	color_out = texture(texture_sampler[num_texture], uv_out).rgba;
-	//color_out = abs(vec4(uv_out.x, uv_out.y, normal_out.z, 1));
+	// Normal of the computed fragment, in camera space
+	vec3 n = normalize(normal_cameraspace);
 
-	//color_out = vec4(v, 1 - v, 1 - v, 1);
+	// Direction of the light (from the fragment to the light)
+	vec3 l = normalize(lightDirection_cameraspace);
+
+	// Eye vector (towards the camera)
+	vec3 e = normalize(eyeDirection_cameraspace);
+
+	// Direction in which the triangle reflects the light
+	vec3 r = reflect(-l, n);
+
+	// Cosine of the angle between the Eye vector and the Reflect vector, clamped to 0
+	//  - Looking into the reflection -> 1
+	//  - Looking elsewhere -> < 1
+	float cos_alpha = clamp(dot(e, r), 0, 1);
+
+	// Cosine of the angle between the normal and the light direction, clamped above 0
+	//  - light is at the vertical of the triangle -> 1
+	//  - light is perpendicular to the triangle -> 0
+	//  - light is behind the triangle -> 0
+	float cos_theta = clamp(dot(n, l), 0, 1);
+	float dist = distance(position_worldspace, lightPos_worldspace);
+
+	vec4 color = texture(texture_sampler[num_texture], uv_out).rgba;
+	vec4 ambient = vec4(ambient_power, ambient_power, ambient_power, 1) * color;
+	diffus = color;
+	specular = color;
+
+	vec4 c_out = ambient // Ambient : simulates indirect lighting
+	+ diffus * light_color * light_power * cos_theta / (dist * dist) // Diffuse : "color" of the object
+	+ specular * light_color * light_power * pow(cos_alpha, 5) / (dist * dist); // Specular : reflective highlight, like a mirror
+
+	// Gamma correction
+	c_out.x = pow(c_out.x, 1 / 2.2);
+	c_out.y = pow(c_out.y, 1 / 2.2);
+	c_out.z = pow(c_out.z, 1 / 2.2);
+
+	color_out = c_out;
 }

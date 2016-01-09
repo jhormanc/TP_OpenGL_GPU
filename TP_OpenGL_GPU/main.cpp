@@ -31,6 +31,7 @@ void init();
 std::regex obj_regex1("f [0-9]+// [0-9]+// [0-9]+//(.*)");
 std::regex obj_regex2("f [0-9]+//[0-9]+ [0-9]+//[0-9]+ [0-9]+//[0-9]+(.*)");
 std::regex obj_regex3("f [0-9]+/[0-9]+/[0-9]+ [0-9]+/[0-9]+/[0-9]+ [0-9]+/[0-9]+/[0-9]+[\\r\\n]*");
+std::regex obj_regex4("f [0-9]+/[0-9]+(/?) [0-9]+/[0-9]+(/?) [0-9]+/[0-9]+(/?)(.*)");
 
 // This function is called on any openGL API error
 void APIENTRY debug(GLenum, // source
@@ -46,13 +47,13 @@ void APIENTRY debug(GLenum, // source
 
 struct Mesh
 {
-	vector<glm::vec4> vertices;
-	vector<glm::vec2> textures;
-	vector<glm::vec3> normals;
-	vector<GLushort> verticesIndex;
-	vector<GLushort> texturesIndex;
-	vector<GLint> texturesNumber;
-	vector<GLushort> normalsIndex;
+	std::vector<glm::vec4> vertices;
+	std::vector<glm::vec2> textures;
+	std::vector<glm::vec3> normals;
+	std::vector<GLushort> verticesIndex;
+	std::vector<GLushort> texturesIndex;
+	std::vector<GLint> texturesNumber;
+	std::vector<GLushort> normalsIndex;
 
 	void merge(Mesh* m)
 	{
@@ -83,7 +84,66 @@ struct Mesh
 	}
 };
 
-void indexData(vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<glm::vec3> &normals, vector<GLushort> &verticesIndex, vector<GLushort> &texturesIndex, vector<GLushort> &normalsIndex, vector<GLint> &texturesNumber)
+void translate(std::vector<glm::vec4> &points, const glm::vec3 &t)
+{
+	for (unsigned int i = 0; i < points.size(); i++)
+	{
+		points[i] += glm::vec4(t.x, t.y, t.z, 0.f);
+	}
+}
+
+glm::vec4 maxVec4(const glm::vec4 &v1, const glm::vec4 &v2, const glm::vec4 &center)
+{
+	if (glm::distance(v1, center) > glm::distance(v2, center))
+		return v1;
+	return v2;
+}
+
+void normalizePointList(std::vector<glm::vec4> &points, const glm::vec3 &pos, const glm::vec3 &scale)
+{
+	glm::vec3 shift(0.f);
+	for (unsigned int i = 0; i < points.size(); i++)
+	{
+		shift += glm::vec3(points[i].x, points[i].y, points[i].z);
+	}
+	shift /= (float)points.size();
+
+	translate(points, -shift);
+	float minX, maxX, minY, maxY, minZ, maxZ, diffX, diffY, diffZ;
+	maxX = (minX = points[0].x);
+	maxY = (minY = points[0].y);
+	maxZ = (minZ = points[0].z);
+	glm::vec4 max(points[0]);
+	glm::vec4 center(shift.x, shift.y, shift.z, 1.f);
+
+	for (unsigned int i = 1; i < points.size(); i++)
+	{
+		maxX = std::fmaxf(maxX, points[i].x);
+		minX = std::fminf(minX, points[i].x);
+
+		maxY = std::fmaxf(maxY, points[i].y);
+		minY = std::fminf(minY, points[i].y);
+
+		maxZ = std::fmaxf(maxZ, points[i].z);
+		minZ = std::fminf(minZ, points[i].z);
+		max = maxVec4(max, points[i], center);
+	}
+
+	diffX = maxX - minX;
+	diffY = maxY - minY;
+	diffZ = maxZ - minZ;
+
+	float length = max.length();
+
+	for (unsigned int i = 0; i < points.size(); i++)
+	{
+		points[i].x = pos.x + (((points[i].x - minX) - diffX * 0.5f) / (length * 0.5f)) * scale.x;
+		points[i].y = pos.y + (((points[i].y - minY) - diffY * 0.5f) / (length * 0.5f)) * scale.y;
+		points[i].z = pos.z + (((points[i].z - minZ) - diffZ * 0.5f) / (length * 0.5f)) * scale.z;
+	}
+}
+
+void indexData(std::vector<glm::vec4> &vertices, std::vector<glm::vec2> &textures, std::vector<glm::vec3> &normals, std::vector<GLushort> &verticesIndex, std::vector<GLushort> &texturesIndex, std::vector<GLushort> &normalsIndex, std::vector<GLint> &texturesNumber)
 {
 	std::vector<glm::vec4> new_vertices;
 	std::vector<glm::vec2> new_uvs;
@@ -99,6 +159,8 @@ void indexData(vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<
 				unsigned int vertexIndex = verticesIndex[i];
 				glm::vec4 vertex = vertices[vertexIndex - 1];
 				new_vertices.push_back(vertex);
+				GLint num = texturesNumber[vertexIndex - 1];
+				new_textures_number.push_back(num);
 			}
 		}
 		else
@@ -107,6 +169,8 @@ void indexData(vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<
 			{
 				glm::vec4 vertex = vertices[i];
 				new_vertices.push_back(vertex);
+				GLint num = texturesNumber[i];
+				new_textures_number.push_back(num);
 			}
 		}
 	}
@@ -120,8 +184,8 @@ void indexData(vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<
 				unsigned int uvIndex = texturesIndex[i];
 				glm::vec2 uv = textures[uvIndex - 1];
 				new_uvs.push_back(uv);
-				GLint num = texturesNumber[uvIndex - 1];
-				new_textures_number.push_back(num);
+				/*GLint num = texturesNumber[uvIndex - 1];
+				new_textures_number.push_back(num);*/
 			}
 		}
 		else
@@ -130,8 +194,8 @@ void indexData(vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<
 			{
 				glm::vec2 uv = textures[i];
 				new_uvs.push_back(uv);
-				GLint num = texturesNumber[i];
-				new_textures_number.push_back(num);
+				/*GLint num = texturesNumber[i];
+				new_textures_number.push_back(num);*/
 			}
 		}
 	}
@@ -163,8 +227,8 @@ void indexData(vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<
 	texturesNumber = new_textures_number;
 }
 
-bool load_obj(const char* filename, vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<glm::vec3> &normals, vector<GLushort> &verticesIndex, 
-	vector<GLushort> &texturesIndex, vector<GLushort> &normalsIndex, vector<GLint> &texturesNumber, GLint num_texture,
+bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vector<glm::vec2> &textures, std::vector<glm::vec3> &normals, std::vector<GLushort> &verticesIndex,
+	std::vector<GLushort> &texturesIndex, std::vector<GLushort> &normalsIndex, std::vector<GLint> &texturesNumber, GLint num_texture,
 	const bool indexing_data, const glm::vec3 pos = glm::vec3(0.f), const glm::vec3 scale = glm::vec3(1.f))
 {
 	FILE *file;
@@ -186,17 +250,15 @@ bool load_obj(const char* filename, vector<glm::vec4> &vertices, vector<glm::vec
 		{
 			glm::vec3 vertex;
 			sscanf_s(line, "v %f %f %f\n", &vertex.x, &vertex.y, &vertex.z);
-			vertices.push_back(glm::vec4(pos.x + vertex.x * scale.x,
-				pos.y + vertex.y * scale.y, 
-				pos.z + vertex.z * scale.z, 
-				1.f));
+			vertices.push_back(glm::vec4(vertex.x,vertex.y, vertex.z, 1.f));
+			texturesNumber.push_back(num_texture);
 		}
 		else if (strncmp(line, "vt", 2) == 0)
 		{
 			glm::vec2 uv;
 			sscanf_s(line, "vt %f %f\n", &uv.x, &uv.y);
 			textures.push_back(uv);
-			texturesNumber.push_back(num_texture);
+			/*texturesNumber.push_back(num_texture);*/
 		}
 		else if (strncmp(line, "vn", 2) == 0)
 		{
@@ -247,8 +309,24 @@ bool load_obj(const char* filename, vector<glm::vec4> &vertices, vector<glm::vec
 					verticesIndex.push_back(vertexIndex[2]);
 				}
 			}
+			else if (std::regex_match(line, obj_regex4))
+			{
+				int matches = sscanf_s(line, "f %d/%d %d/%d %d/%d\n", &vertexIndex[0], &uvIndex[0], &vertexIndex[1], &uvIndex[1], &vertexIndex[2], &uvIndex[2]);
+				if (matches == 6)
+				{
+					verticesIndex.push_back(vertexIndex[0]);
+					verticesIndex.push_back(vertexIndex[1]);
+					verticesIndex.push_back(vertexIndex[2]);
+					texturesIndex.push_back(uvIndex[0]);
+					texturesIndex.push_back(uvIndex[1]);
+					texturesIndex.push_back(uvIndex[2]);
+				}
+			}
 		}
 	}
+
+	// Set position and scale
+	normalizePointList(vertices, pos, scale);
 
 	// Reindexing data
 	if (indexing_data)
@@ -437,13 +515,14 @@ struct
 	clock_t start;
 	glm::vec4 p;
 	glm::vec3 camPos;
+	glm::vec3 lightPos;
 	GLfloat near, far, fov;
 	GLuint buffer;
 	GLuint normalsBuffer;
 	GLuint colorbuffer;
 	GLuint textureNumberBuffer;
-	GLuint texturesBuffer[2];
-	GLuint texturesSamplerBuffer[2];
+	GLuint texturesBuffer[3];
+	GLuint texturesSamplerBuffer[3];
 
 	GLfloat size;
 } gs;
@@ -473,18 +552,41 @@ void init()
 
 	// Global parameters
 	gs.start = clock();
-	gs.p = glm::vec4(0.f, 2.f, 0.f, 0.f);
-	gs.camPos = glm::vec3(0.f, 5.f, -15.f);
+	gs.p = glm::vec4(0.f, 1.f, 0.f, 0.f);
+	gs.camPos = glm::vec3(0.f, 1.f, -7.f); 
+	gs.lightPos = glm::vec3(0.f, 5.f, 0.f);
 	gs.near = 0.1f;
 	gs.far = 100.f;
 	gs.fov = 45.f;
 
-	Mesh *mesh = createMesh("Stormtrooper.obj", false, 0);
+	float cube_size = 10.f;
+	float size = cube_size * 0.85f;
+
+	Mesh *mesh = createMesh("Stormtrooper.obj", false, 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
 	if (mesh != nullptr)
 	{
-		Mesh *wall_1 = createMesh("Cube.obj", false, 1, glm::vec3(0.f, -10.f, 0.f), glm::vec3(10.f));
-		mesh->merge(wall_1);
+		Mesh *cube = createMesh("RubiksCube.obj", false, 1, glm::vec3(0.f, -size, 0.f), glm::vec3(cube_size));
+		if (cube != nullptr)
+		{
+			mesh->merge(cube);
+			translate(cube->vertices, glm::vec3(2.f * size, size * 2.f, 0.f));
+			mesh->merge(cube);
+			translate(cube->vertices, glm::vec3(-2.f * size, 0.f, 2.f * size));
+			mesh->merge(cube);
+			translate(cube->vertices, glm::vec3(-2.f * size, 0.f, -2.f * size));
+			mesh->merge(cube);
+			translate(cube->vertices, glm::vec3(2.f * size, 0.f, -2.f * size));
+			mesh->merge(cube);
+			translate(cube->vertices, glm::vec3(0.f, 2.f * size, 2.f * size));
+			mesh->merge(cube);
+		}
+
+		Mesh *dragon = createMesh("Alduin.obj", false, 2, glm::vec3(-2.f, cube_size * 0.2f, 0.f), glm::vec3(1.f));
+		if (dragon != nullptr)
+		{
+			mesh->merge(dragon);
+		}
 	}
 
 	if (mesh != nullptr)
@@ -543,6 +645,7 @@ void init()
 		glVertexAttribIPointer(14, 1, GL_INT, 0, (void *)0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+		// Textures
 		glGenTextures(2, gs.texturesBuffer);
 		glGenSamplers(2, gs.texturesSamplerBuffer);
 
@@ -556,7 +659,15 @@ void init()
 
 		gs.texturesBuffer[1] = SOIL_load_OGL_texture
 			(
-			"Cube.dds",
+			"Cube.jpg",
+			SOIL_LOAD_AUTO,
+			SOIL_CREATE_NEW_ID,
+			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
+			);
+
+		gs.texturesBuffer[2] = SOIL_load_OGL_texture
+			(
+			"Alduin.png",
 			SOIL_LOAD_AUTO,
 			SOIL_CREATE_NEW_ID,
 			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
@@ -572,6 +683,12 @@ void init()
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
 		glBindSampler(1, gs.texturesSamplerBuffer[1]);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
+
+		glActiveTexture(GL_TEXTURE2);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[2]);
+		glBindSampler(1, gs.texturesSamplerBuffer[2]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 
 		glBindVertexArray(0);
@@ -594,16 +711,20 @@ void render(GLFWwindow* window)
 	glViewport(0, 0, width, height);
 
 	float c = (float)(clock() - gs.start) / CLOCKS_PER_SEC;
-	//glProgramUniform1f(gs.program, 3, std::abs(cos(c)));
+	//glProgramUniform1f(gs.program, 5, std::abs(cos(c)));
 
 	glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
-	glm::mat4x4 m;
+	glm::mat4x4 mvp;
 	glm::mat4x4 projection = glm::perspective(glm::radians(gs.fov), (float)(WIDTH / (float)HEIGHT), gs.near, gs.far);
 	glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
 	glm::mat4x4 model = glm::mat4(1.0f); //glm::rotate(glm::mat4(1.f), c, glm::vec3(0.f, 1.f, 0.f));
 	//glm::mat4x4 m_view = glm::translate(glm::mat4(1.f), glm::vec3(0.5, 0.5, 0.f));
-	m = projection * view * model;
-	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &m[0][0]);
+	mvp = projection * view * model;
+	
+	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
+	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &model[0][0]);
+	glProgramUniformMatrix4fv(gs.program, 3, 1, GL_FALSE, &view[0][0]);
+	glProgramUniform3fv(gs.program, 4, 1, &gs.lightPos[0]);
 
 	gs.camPos.x = 5.f * cos(c);
 	gs.camPos.z = 5.f * sin(c);
@@ -624,12 +745,12 @@ void render(GLFWwindow* window)
 		glUniform1i(texLoc, 0);
 		texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
 		glUniform1i(texLoc, 1);
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
+		glUniform1i(texLoc, 2);
+		
 		//glProgramUniform4f(gs.program, 1, gs.p.x, gs.p.y, gs.p.z, gs.p.w);
 		glDrawArrays(GL_TRIANGLES, 0, gs.size);
 		//glDrawElements()
-
-		//glProgramUniform4f(gs.program, 1, -gs.p.x, -gs.p.y, gs.p.z, gs.p.w);
-		//glDrawArrays(GL_TRIANGLES, 0, gs.size);
 	}
 
 	glBindVertexArray(0);

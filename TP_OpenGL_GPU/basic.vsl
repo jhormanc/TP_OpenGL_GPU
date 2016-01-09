@@ -1,6 +1,10 @@
 #version 430
 
-layout(location = 1) uniform mat4x4 mvp;
+layout(location = 1) uniform mat4x4 MVP;
+layout(location = 2) uniform mat4x4 M;
+layout(location = 3) uniform mat4x4 V;
+layout(location = 4) uniform vec3 light_pos;
+
 layout(location = 11) in vec4 pt;
 layout(location = 12) in vec3 normal;
 layout(location = 13) in vec2 uv;
@@ -9,11 +13,32 @@ layout(location = 14) in int num_sampler;
 out vec3 normal_out;
 out vec2 uv_out;
 out int num_texture;
+out vec3 position_worldspace;
+out vec3 eyeDirection_cameraspace;
+out vec3 lightDirection_cameraspace;
+out vec3 normal_cameraspace;
+out vec3 lightPos_worldspace;
 
 void main()
 {
+	lightPos_worldspace = light_pos;
 	num_texture = num_sampler;
 	uv_out = uv;
 	normal_out = normal;
-	gl_Position = mvp * pt;
+	gl_Position = MVP * pt;
+
+	// Position of the vertex, in worldspace : M * position
+    position_worldspace = (M * pt).xyz;
+  
+    // Vector that goes from the vertex to the camera, in camera space.
+    // In camera space, the camera is at the origin (0,0,0).
+	vec3 vertexPosition_cameraspace = (V * M * pt).xyz;
+	eyeDirection_cameraspace = vec3(0, 0, 0) - vertexPosition_cameraspace;
+ 
+	// Vector that goes from the vertex to the light, in camera space. M is ommited because it's identity.
+	vec3 lightPosition_cameraspace = (V * vec4(light_pos, 1)).xyz;
+	lightDirection_cameraspace = lightPosition_cameraspace + eyeDirection_cameraspace;
+ 
+	// Normal of the the vertex, in camera space
+	normal_cameraspace = (V * M * vec4(normal, 0)).xyz; // Only correct if ModelMatrix does not scale the model ! Use its inverse transpose if not.
 }
