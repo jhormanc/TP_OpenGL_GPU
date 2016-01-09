@@ -16,6 +16,8 @@
 #include <glm\glm\glm.hpp>
 #include <glm\glm\gtx\transform.hpp>
 
+#include <soil\SOIL.h>
+
 #define WIDTH 640
 #define HEIGHT 480
 
@@ -49,6 +51,7 @@ struct Mesh
 	vector<glm::vec3> normals;
 	vector<GLushort> verticesIndex;
 	vector<GLushort> texturesIndex;
+	vector<GLint> texturesNumber;
 	vector<GLushort> normalsIndex;
 
 	void merge(Mesh* m)
@@ -74,14 +77,18 @@ struct Mesh
 
 		for (int i = 0; i < m->normalsIndex.size(); i++)
 			normalsIndex.push_back(normals_size + m->normalsIndex[i]);
+
+		for (int i = 0; i < m->texturesNumber.size(); i++)
+			texturesNumber.push_back(m->texturesNumber[i]);
 	}
 };
 
-void indexData(vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<glm::vec3> &normals, vector<GLushort> &verticesIndex, vector<GLushort> &texturesIndex, vector<GLushort> &normalsIndex)
+void indexData(vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<glm::vec3> &normals, vector<GLushort> &verticesIndex, vector<GLushort> &texturesIndex, vector<GLushort> &normalsIndex, vector<GLint> &texturesNumber)
 {
 	std::vector<glm::vec4> new_vertices;
 	std::vector<glm::vec2> new_uvs;
 	std::vector<glm::vec3> new_normals;
+	std::vector<GLint> new_textures_number;
 
 	if (vertices.size() > 0)
 	{
@@ -113,6 +120,8 @@ void indexData(vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<
 				unsigned int uvIndex = texturesIndex[i];
 				glm::vec2 uv = textures[uvIndex - 1];
 				new_uvs.push_back(uv);
+				GLint num = texturesNumber[uvIndex - 1];
+				new_textures_number.push_back(num);
 			}
 		}
 		else
@@ -121,6 +130,8 @@ void indexData(vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<
 			{
 				glm::vec2 uv = textures[i];
 				new_uvs.push_back(uv);
+				GLint num = texturesNumber[i];
+				new_textures_number.push_back(num);
 			}
 		}
 	}
@@ -149,9 +160,11 @@ void indexData(vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<
 	vertices = new_vertices;
 	normals = new_normals;
 	textures = new_uvs;
+	texturesNumber = new_textures_number;
 }
 
-bool load_obj(const char* filename, vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<glm::vec3> &normals, vector<GLushort> &verticesIndex, vector<GLushort> &texturesIndex, vector<GLushort> &normalsIndex, 
+bool load_obj(const char* filename, vector<glm::vec4> &vertices, vector<glm::vec2> &textures, vector<glm::vec3> &normals, vector<GLushort> &verticesIndex, 
+	vector<GLushort> &texturesIndex, vector<GLushort> &normalsIndex, vector<GLint> &texturesNumber, GLint num_texture,
 	const bool indexing_data, const glm::vec3 pos = glm::vec3(0.f), const glm::vec3 scale = glm::vec3(1.f))
 {
 	FILE *file;
@@ -183,6 +196,7 @@ bool load_obj(const char* filename, vector<glm::vec4> &vertices, vector<glm::vec
 			glm::vec2 uv;
 			sscanf_s(line, "vt %f %f\n", &uv.x, &uv.y);
 			textures.push_back(uv);
+			texturesNumber.push_back(num_texture);
 		}
 		else if (strncmp(line, "vn", 2) == 0)
 		{
@@ -238,7 +252,7 @@ bool load_obj(const char* filename, vector<glm::vec4> &vertices, vector<glm::vec
 
 	// Reindexing data
 	if (indexing_data)
-		indexData(vertices, textures, normals, verticesIndex, texturesIndex, normalsIndex);
+		indexData(vertices, textures, normals, verticesIndex, texturesIndex, normalsIndex, texturesNumber);
 
 	// Manually compute normals if necessary
 	if (normals.size() == 0 && verticesIndex.size() > 0)
@@ -263,7 +277,7 @@ bool load_obj(const char* filename, vector<glm::vec4> &vertices, vector<glm::vec
 
 void indexDataMesh(Mesh *m)
 {
-	indexData(m->vertices, m->textures, m->normals, m->verticesIndex, m->texturesIndex, m->normalsIndex);
+	indexData(m->vertices, m->textures, m->normals, m->verticesIndex, m->texturesIndex, m->normalsIndex, m->texturesNumber);
 }
 
 int main(void)
@@ -427,14 +441,17 @@ struct
 	GLuint buffer;
 	GLuint normalsBuffer;
 	GLuint colorbuffer;
+	GLuint textureNumberBuffer;
+	GLuint texturesBuffer[2];
+	GLuint texturesSamplerBuffer[2];
 
 	GLfloat size;
 } gs;
 
-Mesh* createMesh(const char* filename, const bool index_data, const glm::vec3 pos = glm::vec3(0.f), const glm::vec3 scale = glm::vec3(1.f))
+Mesh* createMesh(const char* filename, const bool index_data, GLushort num_texture, const glm::vec3 pos = glm::vec3(0.f), const glm::vec3 scale = glm::vec3(1.f))
 {
 	Mesh *m = new Mesh();
-	if (load_obj(filename, m->vertices, m->textures, m->normals, m->verticesIndex, m->texturesIndex, m->normalsIndex, index_data, pos, scale))
+	if (load_obj(filename, m->vertices, m->textures, m->normals, m->verticesIndex, m->texturesIndex, m->normalsIndex, m->texturesNumber, num_texture, index_data, pos, scale))
 		return m;
 	return nullptr;
 }
@@ -442,6 +459,9 @@ Mesh* createMesh(const char* filename, const bool index_data, const glm::vec3 po
 void init()
 {
 	glClearColor(0.f, 0.f, 0.f, 1.f);
+	glCullFace(GL_BACK);
+	glFrontFace(GL_CCW);
+	glEnable(GL_CULL_FACE);
 	glClearDepth(1.0f); // Set background depth to farthest
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for z-culling
 	glDepthFunc(GL_LEQUAL); // Set the type of depth-test
@@ -453,20 +473,20 @@ void init()
 
 	// Global parameters
 	gs.start = clock();
-	gs.p = glm::vec4(0.f, 3.f, 0.f, 0.f);
-	gs.camPos = glm::vec3(0.f, 5.f, -10.f);
+	gs.p = glm::vec4(0.f, 2.f, 0.f, 0.f);
+	gs.camPos = glm::vec3(0.f, 5.f, -15.f);
 	gs.near = 0.1f;
 	gs.far = 100.f;
 	gs.fov = 45.f;
 
-	Mesh *mesh = createMesh("Stormtrooper.obj", false);
+	Mesh *mesh = createMesh("Stormtrooper.obj", false, 0);
 
 	if (mesh != nullptr)
 	{
-		Mesh *wall_1 = createMesh("Cube.obj", false, glm::vec3(0.f, -10.f, 0.f), glm::vec3(10.f));
+		Mesh *wall_1 = createMesh("Cube.obj", false, 1, glm::vec3(0.f, -10.f, 0.f), glm::vec3(10.f));
 		mesh->merge(wall_1);
 	}
-	
+
 	if (mesh != nullptr)
 	{
 		indexDataMesh(mesh);
@@ -490,6 +510,12 @@ void init()
 		glBufferData(GL_ARRAY_BUFFER, mesh->textures.size() * sizeof(glm::vec2), &mesh->textures[0], GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+		// Texture number buffer
+		glGenBuffers(1, &gs.textureNumberBuffer);
+		glBindBuffer(GL_ARRAY_BUFFER, gs.textureNumberBuffer);
+		glBufferData(GL_ARRAY_BUFFER, mesh->texturesNumber.size() * sizeof(GLint), &mesh->texturesNumber[0], GL_STATIC_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
 		glCreateVertexArrays(1, &gs.vao);
 		glBindVertexArray(gs.vao);
 
@@ -499,17 +525,54 @@ void init()
 		glVertexAttribPointer(11, 4, GL_FLOAT, GL_FALSE, 0, (void *)0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-		//  Vertex shader input vec3 normal
+		// Vertex shader input vec3 normal
 		glBindBuffer(GL_ARRAY_BUFFER, gs.normalsBuffer);
 		glEnableVertexArrayAttrib(gs.vao, 12);
 		glVertexAttribPointer(12, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-		//  Vertex shader input vec2 uv
+		// Vertex shader input vec2 uv
 		glBindBuffer(GL_ARRAY_BUFFER, gs.colorbuffer);
 		glEnableVertexArrayAttrib(gs.vao, 13);
 		glVertexAttribPointer(13, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		//  Vertex shader input int num_sampler
+		glBindBuffer(GL_ARRAY_BUFFER, gs.textureNumberBuffer);
+		glEnableVertexArrayAttrib(gs.vao, 14);
+		glVertexAttribIPointer(14, 1, GL_INT, 0, (void *)0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		glGenTextures(2, gs.texturesBuffer);
+		glGenSamplers(2, gs.texturesSamplerBuffer);
+
+		gs.texturesBuffer[0] = SOIL_load_OGL_texture
+			(
+			"Stormtrooper.tga",
+			SOIL_LOAD_AUTO,
+			SOIL_CREATE_NEW_ID,
+			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
+			);
+
+		gs.texturesBuffer[1] = SOIL_load_OGL_texture
+			(
+			"Cube.dds",
+			SOIL_LOAD_AUTO,
+			SOIL_CREATE_NEW_ID,
+			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
+			);
+
+		glActiveTexture(GL_TEXTURE0);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
+		glBindSampler(0, gs.texturesSamplerBuffer[0]);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
+		
+		glActiveTexture(GL_TEXTURE1);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
+		glBindSampler(1, gs.texturesSamplerBuffer[1]);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 
 		glBindVertexArray(0);
 	}
@@ -557,6 +620,10 @@ void render(GLFWwindow* window)
 	glUseProgram(gs.program);
 	glBindVertexArray(gs.vao);
 	{
+		GLuint texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
+		glUniform1i(texLoc, 0);
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
+		glUniform1i(texLoc, 1);
 		//glProgramUniform4f(gs.program, 1, gs.p.x, gs.p.y, gs.p.z, gs.p.w);
 		glDrawArrays(GL_TRIANGLES, 0, gs.size);
 		//glDrawElements()

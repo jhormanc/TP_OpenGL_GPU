@@ -3,14 +3,15 @@
 out vec4 color_out;
 in vec3 normal_out;
 in vec2 uv_out;
+flat in int num_texture;
 
 layout(location = 3) uniform float v;
-uniform sampler2D texture_sampler;
+uniform sampler2D texture_sampler[2];
 
 void main()
 {
-	//color_out = texture(texture_sampler, uv_out).rgba;
-	color_out = abs(vec4(normal_out.x, normal_out.y, normal_out.z, 1));
+	color_out = texture(texture_sampler[num_texture], uv_out).rgba;
+	//color_out = abs(vec4(uv_out.x, uv_out.y, normal_out.z, 1));
 
 	//color_out = vec4(v, 1 - v, 1 - v, 1);
 }
