@@ -24,5 +24,6 @@
     <None Include="basic.fsl" />
     <None Include="shadow.fsl" />
     <None Include="shadow.vsl" />
+    <None Include="texture.fsl" />
   </ItemGroup>
 </Project>

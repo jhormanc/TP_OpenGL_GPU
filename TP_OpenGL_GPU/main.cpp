@@ -524,15 +524,10 @@ struct
 	GLuint texturesBuffer[3];
 	GLuint texturesSamplerBuffer[3];
 
-	GLuint vao_shadow;
-	GLuint program_shadow;
+	GLuint fbo;
+	GLuint program_fbo;
 	GLuint framebuffer;
 	GLuint renderedTexture;
-	GLuint depthrenderbuffer;
-	GLuint quad;
-	GLfloat cube_size;
-	GLuint buffer_quad;
-	GLuint colorbuffer_quad;
 
 	GLfloat size;
 } gs;
@@ -559,13 +554,13 @@ void init()
 
 	// Build our program and an empty VAO
 	gs.program = buildProgram("basic.vsl", "basic.fsl");
-	gs.program_shadow = buildProgram("shadow.vsl", "shadow.fsl");
+	gs.program_fbo = buildProgram("basic.vsl", "texture.fsl");
 
 	// Global parameters
 	gs.start = clock();
 	gs.p = glm::vec4(0.f, 1.f, 0.f, 0.f);
 	gs.camPos = glm::vec3(0.f, 1.f, -7.f); 
-	gs.lightPos = glm::vec3(0.f, 5.f, 0.f);
+	gs.lightPos = glm::vec3(0.5f, 2, 2); // 0.f, 5.f, 0.f
 	gs.near = 0.1f;
 	gs.far = 100.f;
 	gs.fov = 45.f;
@@ -573,7 +568,9 @@ void init()
 	float cube_size = 10.f;
 	float size = cube_size * 0.85f;
 
-	Mesh *mesh = createMesh("Stormtrooper.obj", false, 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
+	Mesh *mesh = createMesh("Cube.obj", false, 1, glm::vec3(0.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
+
+	//Mesh *mesh = createMesh("Stormtrooper.obj", false, 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
 	if (mesh != nullptr)
 	{
@@ -581,7 +578,7 @@ void init()
 		if (cube != nullptr)
 		{
 			mesh->merge(cube);
-			translate(cube->vertices, glm::vec3(2.f * size, size * 2.f, 0.f));
+			/*translate(cube->vertices, glm::vec3(2.f * size, size * 2.f, 0.f));
 			mesh->merge(cube);
 			translate(cube->vertices, glm::vec3(-2.f * size, 0.f, 2.f * size));
 			mesh->merge(cube);
@@ -590,14 +587,14 @@ void init()
 			translate(cube->vertices, glm::vec3(2.f * size, 0.f, -2.f * size));
 			mesh->merge(cube);
 			translate(cube->vertices, glm::vec3(0.f, 2.f * size, 2.f * size));
-			mesh->merge(cube);
+			mesh->merge(cube);*/
 		}
 
-		Mesh *dragon = createMesh("Alduin.obj", false, 2, glm::vec3(-4.f, cube_size * 0.2f, 0.f), glm::vec3(3.f));
+		/*Mesh *dragon = createMesh("Alduin.obj", false, 2, glm::vec3(-4.f, cube_size * 0.2f, 0.f), glm::vec3(1.f));
 		if (dragon != nullptr)
 		{
 			mesh->merge(dragon);
-		}
+		}*/
 	}
 
 	if (mesh != nullptr)
@@ -690,13 +687,12 @@ void init()
 		glBindSampler(0, gs.texturesSamplerBuffer[0]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 		//glDisable(GL_TEXTURE0);
-		
+
 		glActiveTexture(GL_TEXTURE1);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
 		glBindSampler(1, gs.texturesSamplerBuffer[1]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
-		//glDisable(GL_TEXTURE1);
 
 		glActiveTexture(GL_TEXTURE2);
 		glEnable(GL_TEXTURE_2D);
@@ -705,47 +701,32 @@ void init()
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 		//glDisable(GL_TEXTURE2);
 
-		glBindVertexArray(0);
-
-		Mesh *c = createMesh("Cube.obj", true, 1, glm::vec3(0.f), glm::vec3(2.f));
-		gs.cube_size = c->vertices.size();
-
-		glGenBuffers(1, &gs.buffer_quad);
-		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_quad);
-		glBufferData(GL_ARRAY_BUFFER, c->vertices.size() * sizeof(glm::vec4), &c->vertices[0], GL_STATIC_DRAW);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-		glGenBuffers(1, &gs.colorbuffer_quad);
-		glBindBuffer(GL_ARRAY_BUFFER, gs.colorbuffer_quad);
-		glBufferData(GL_ARRAY_BUFFER, c->textures.size() * sizeof(glm::vec2), &c->textures[0], GL_STATIC_DRAW);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-		// Shadow
-		glCreateVertexArrays(1, &gs.vao_shadow);
-		glBindVertexArray(gs.vao_shadow);
-
-		// Vertex shader input vec4 pt
-		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_quad);
-		glEnableVertexArrayAttrib(gs.vao_shadow, 11);
-		glVertexAttribPointer(11, 4, GL_FLOAT, GL_FALSE, 0, (void *)0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-		// Vertex shader input vec2 uv
-		glBindBuffer(GL_ARRAY_BUFFER, gs.colorbuffer_quad);
-		glEnableVertexArrayAttrib(gs.vao_shadow, 12);
-		glVertexAttribPointer(12, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-
 		// The texture we're going to render to
 		glGenTextures(1, &gs.renderedTexture);
 		// "Bind" the newly created texture : all future texture functions will modify this texture
 		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
-		glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, WIDTH, HEIGHT);
+
+		// GL_LINEAR does not make sense for depth texture. However, next tutorial shows usage of GL_LINEAR and PCF
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+		// Remove artifact on the edges of the shadowmap
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, WIDTH, HEIGHT, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, 0);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		//glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, WIDTH, HEIGHT);
 
 		glGenFramebuffers(1, &gs.framebuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gs.renderedTexture, 0);
 		
+		// Instruct openGL that we won't bind a color texture with the currently bound FBO
+		/*glDrawBuffer(GL_NONE);
+		glReadBuffer(GL_NONE);*/
+
+		// attach the texture to FBO depth attachment point
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gs.renderedTexture, 0);
+
 		// Always check that our framebuffer is ok
 		assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 
@@ -755,6 +736,18 @@ void init()
 		glActiveTexture(GL_TEXTURE3);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
+
+		glBindVertexArray(0);
+
+		// FBO
+		glCreateVertexArrays(1, &gs.fbo);
+		glBindVertexArray(gs.fbo);
+
+		// Vertex shader input vec4 pt
+		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer);
+		glEnableVertexArrayAttrib(gs.fbo, 11);
+		glVertexAttribPointer(11, 4, GL_FLOAT, GL_FALSE, 0, (void *)0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 		glBindVertexArray(0);
 	}
@@ -782,43 +775,60 @@ void render(GLFWwindow* window)
 	glm::mat4x4 mvp;
 	glm::mat4x4 projection = glm::perspective(glm::radians(gs.fov), (float)(WIDTH / (float)HEIGHT), gs.near, gs.far);
 	glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
-	glm::mat4x4 model = glm::mat4(1.0f); //glm::rotate(glm::mat4(1.f), c, glm::vec3(0.f, 1.f, 0.f));
-	//glm::mat4x4 m_view = glm::translate(glm::mat4(1.f), glm::vec3(0.5, 0.5, 0.f));
+	glm::mat4x4 model = glm::mat4(1.0f);
 	mvp = projection * view * model;
-	
-	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
-	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &model[0][0]);
-	glProgramUniformMatrix4fv(gs.program, 3, 1, GL_FALSE, &view[0][0]);
-	glProgramUniform3fv(gs.program, 4, 1, &gs.lightPos[0]);
 
+	// Compute the MVP matrix from the light's point of view
+	glm::mat4 depthProjectionMatrix = glm::perspective(glm::radians(gs.fov), (float)(WIDTH / (float)HEIGHT), gs.near, gs.far); //glm::ortho<float>(-10, 10, -10, 10, -10, 20);
+	glm::mat4 depthViewMatrix = glm::lookAt(gs.lightPos, glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f));
+	glm::mat4 depthModelMatrix = glm::mat4(1.0f);
+	glm::mat4 depthMVP = depthProjectionMatrix * depthViewMatrix * depthModelMatrix;
+
+	glm::mat4 biasMatrix(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.5f, 0.0f,
+		0.5f, 0.5f, 0.5f, 1.0f
+		);
+	glm::mat4 depthBiasMVP = biasMatrix * depthMVP;
+	GLuint texLoc;
+
+	glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
+	glUseProgram(gs.program_fbo);
+	glBindVertexArray(gs.fbo);
+	{
+		glProgramUniformMatrix4fv(gs.program_fbo, 1, 1, GL_FALSE, &depthMVP[0][0]);
+		glDrawArrays(GL_TRIANGLES, 0, gs.size);
+	}
+	
 	gs.camPos.x = 5.f * cos(c);
 	gs.camPos.z = 5.f * sin(c);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glUseProgram(gs.program);
 	glBindVertexArray(gs.vao);
 	{
-		GLuint texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
+		glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
+		glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &model[0][0]);
+		glProgramUniformMatrix4fv(gs.program, 3, 1, GL_FALSE, &view[0][0]);
+		glProgramUniform3fv(gs.program, 4, 1, &gs.lightPos[0]);
+		// Send our transformation to the currently bound shader, in the "MVP" uniform
+		glProgramUniformMatrix4fv(gs.program, 5, 1, GL_FALSE, &depthBiasMVP[0][0]);
+
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
 		glUniform1i(texLoc, 0);
 		texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
 		glUniform1i(texLoc, 1);
 		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
 		glUniform1i(texLoc, 2);
+		GLuint texLoc = glGetUniformLocation(gs.program, "shadow_map");
+		glUniform1i(texLoc, 3);
 		
 		glDrawArrays(GL_TRIANGLES, 0, gs.size);
 		//glDrawElements()
 	}
 
-	glProgramUniformMatrix4fv(gs.program_shadow, 1, 1, GL_FALSE, &mvp[0][0]);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glUseProgram(gs.program_shadow);
-	glBindVertexArray(gs.vao_shadow);
-	{
-		GLuint texLoc = glGetUniformLocation(gs.program_shadow, "shadow_sampler");
-		glUniform1i(texLoc, 3);
-		glDrawArrays(GL_TRIANGLES, 0, gs.cube_size);
-	}
+	
 
 	glBindVertexArray(0);
 	glUseProgram(0);

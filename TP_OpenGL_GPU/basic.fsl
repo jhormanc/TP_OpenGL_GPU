@@ -9,8 +9,10 @@ in vec3 lightDirection_cameraspace;
 in vec3 normal_cameraspace;
 in vec3 lightPos_worldspace;
 flat in int num_texture;
+in vec4 shadow_coord;
 
 uniform sampler2D texture_sampler[3];
+uniform sampler2D shadow_map;
 vec4 light_color = vec4(1, 1, 1, 1);
 vec4 diffus = vec4(1, 1, 1, 1);
 vec4 specular = vec4(1, 1, 1, 1);
@@ -48,14 +50,27 @@ void main()
 	diffus = color;
 	specular = color;
 
+	vec4 coord = shadow_coord / shadow_coord.w;
+	
+	// Used to lower moiré pattern and self-shadowing
+	coord.z += 0.0005;
+
+	float distFromLight = texture(shadow_map, coord.xy).z;
+		
+	float shadow = 1.0;
+	if (shadow_coord.w > 0.0)
+	 	shadow = distFromLight < coord.z ? 0.5 : 1.0;
+
 	vec4 c_out = ambient // Ambient : simulates indirect lighting
-	+ diffus * light_color * light_power * cos_theta / (dist * dist) // Diffuse : "color" of the object
-	+ specular * light_color * light_power * pow(cos_alpha, 5) / (dist * dist); // Specular : reflective highlight, like a mirror
+	+ shadow * diffus * light_color * light_power * cos_theta / (dist * dist) // Diffuse : "color" of the object
+	+ shadow * specular * light_color * light_power * pow(cos_alpha, 5) / (dist * dist); // Specular : reflective highlight, like a mirror
 
 	// Gamma correction
 	c_out.x = pow(c_out.x, 1 / 2.2);
 	c_out.y = pow(c_out.y, 1 / 2.2);
 	c_out.z = pow(c_out.z, 1 / 2.2);
 
-	color_out = c_out;
+	color_out = vec4(vec3(1, 1, 1) * distFromLight, 1);
+	//color_out = c_out; //vec4(vec3(1, 1, 1) * texture(shadow_map, coord.xy).z, 1);
+	//color_out = vec4(coord.x, coord.y, texture(shadow_map, coord.xy).z, 1);
 }

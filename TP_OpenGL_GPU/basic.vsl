@@ -4,6 +4,7 @@ layout(location = 1) uniform mat4x4 MVP;
 layout(location = 2) uniform mat4x4 M;
 layout(location = 3) uniform mat4x4 V;
 layout(location = 4) uniform vec3 light_pos;
+layout(location = 5) uniform mat4x4 depthBias_MVP;
 
 layout(location = 11) in vec4 pt;
 layout(location = 12) in vec3 normal;
@@ -18,6 +19,7 @@ out vec3 eyeDirection_cameraspace;
 out vec3 lightDirection_cameraspace;
 out vec3 normal_cameraspace;
 out vec3 lightPos_worldspace;
+out vec4 shadow_coord;
 
 void main()
 {
@@ -26,10 +28,11 @@ void main()
 	normal_out = normal;
 	num_texture = num_sampler;
 	lightPos_worldspace = light_pos;
-	
+	shadow_coord = depthBias_MVP * pt;
+
 	// Position of the vertex, in worldspace : M * position
     position_worldspace = (M * pt).xyz;
-  
+
     // Vector that goes from the vertex to the camera, in camera space.
     // In camera space, the camera is at the origin (0,0,0).
 	vec3 vertexPosition_cameraspace = (V * M * pt).xyz;
