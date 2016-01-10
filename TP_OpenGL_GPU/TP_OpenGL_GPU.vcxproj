@@ -124,6 +124,8 @@
   <ItemGroup>
     <None Include="basic.fsl" />
     <None Include="basic.vsl" />
+    <None Include="shadow.fsl" />
+    <None Include="shadow.vsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

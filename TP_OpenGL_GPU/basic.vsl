@@ -21,12 +21,12 @@ out vec3 lightPos_worldspace;
 
 void main()
 {
-	lightPos_worldspace = light_pos;
-	num_texture = num_sampler;
+	gl_Position = MVP * pt;
 	uv_out = uv;
 	normal_out = normal;
-	gl_Position = MVP * pt;
-
+	num_texture = num_sampler;
+	lightPos_worldspace = light_pos;
+	
 	// Position of the vertex, in worldspace : M * position
     position_worldspace = (M * pt).xyz;
   

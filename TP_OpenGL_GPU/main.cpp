@@ -524,6 +524,16 @@ struct
 	GLuint texturesBuffer[3];
 	GLuint texturesSamplerBuffer[3];
 
+	GLuint vao_shadow;
+	GLuint program_shadow;
+	GLuint framebuffer;
+	GLuint renderedTexture;
+	GLuint depthrenderbuffer;
+	GLuint quad;
+	GLfloat cube_size;
+	GLuint buffer_quad;
+	GLuint colorbuffer_quad;
+
 	GLfloat size;
 } gs;
 
@@ -549,6 +559,7 @@ void init()
 
 	// Build our program and an empty VAO
 	gs.program = buildProgram("basic.vsl", "basic.fsl");
+	gs.program_shadow = buildProgram("shadow.vsl", "shadow.fsl");
 
 	// Global parameters
 	gs.start = clock();
@@ -582,7 +593,7 @@ void init()
 			mesh->merge(cube);
 		}
 
-		Mesh *dragon = createMesh("Alduin.obj", false, 2, glm::vec3(-2.f, cube_size * 0.2f, 0.f), glm::vec3(1.f));
+		Mesh *dragon = createMesh("Alduin.obj", false, 2, glm::vec3(-4.f, cube_size * 0.2f, 0.f), glm::vec3(3.f));
 		if (dragon != nullptr)
 		{
 			mesh->merge(dragon);
@@ -678,18 +689,72 @@ void init()
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
 		glBindSampler(0, gs.texturesSamplerBuffer[0]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
+		//glDisable(GL_TEXTURE0);
 		
 		glActiveTexture(GL_TEXTURE1);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
 		glBindSampler(1, gs.texturesSamplerBuffer[1]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
+		//glDisable(GL_TEXTURE1);
 
 		glActiveTexture(GL_TEXTURE2);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[2]);
-		glBindSampler(1, gs.texturesSamplerBuffer[2]);
+		glBindSampler(2, gs.texturesSamplerBuffer[2]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
+		//glDisable(GL_TEXTURE2);
+
+		glBindVertexArray(0);
+
+		Mesh *c = createMesh("Cube.obj", true, 1, glm::vec3(0.f), glm::vec3(2.f));
+		gs.cube_size = c->vertices.size();
+
+		glGenBuffers(1, &gs.buffer_quad);
+		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_quad);
+		glBufferData(GL_ARRAY_BUFFER, c->vertices.size() * sizeof(glm::vec4), &c->vertices[0], GL_STATIC_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		glGenBuffers(1, &gs.colorbuffer_quad);
+		glBindBuffer(GL_ARRAY_BUFFER, gs.colorbuffer_quad);
+		glBufferData(GL_ARRAY_BUFFER, c->textures.size() * sizeof(glm::vec2), &c->textures[0], GL_STATIC_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		// Shadow
+		glCreateVertexArrays(1, &gs.vao_shadow);
+		glBindVertexArray(gs.vao_shadow);
+
+		// Vertex shader input vec4 pt
+		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_quad);
+		glEnableVertexArrayAttrib(gs.vao_shadow, 11);
+		glVertexAttribPointer(11, 4, GL_FLOAT, GL_FALSE, 0, (void *)0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		// Vertex shader input vec2 uv
+		glBindBuffer(GL_ARRAY_BUFFER, gs.colorbuffer_quad);
+		glEnableVertexArrayAttrib(gs.vao_shadow, 12);
+		glVertexAttribPointer(12, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		// The texture we're going to render to
+		glGenTextures(1, &gs.renderedTexture);
+		// "Bind" the newly created texture : all future texture functions will modify this texture
+		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
+		glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, WIDTH, HEIGHT);
+
+		glGenFramebuffers(1, &gs.framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gs.renderedTexture, 0);
+		
+		// Always check that our framebuffer is ok
+		assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+		// Render to our framebuffer
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		glActiveTexture(GL_TEXTURE3);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
 
 		glBindVertexArray(0);
 	}
@@ -705,7 +770,7 @@ void init()
 void render(GLFWwindow* window)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+	
 	int width, height;
 	glfwGetFramebufferSize(window, &width, &height);
 	glViewport(0, 0, width, height);
@@ -728,16 +793,8 @@ void render(GLFWwindow* window)
 
 	gs.camPos.x = 5.f * cos(c);
 	gs.camPos.z = 5.f * sin(c);
-	
-	/*if (gs.p.x > 1.f)
-	{
-		gs.p.x = 0.f;
-		gs.p.y = 0.f;
-	}
 
-	if (c > 1.f)
-		gs.start = clock();*/
-
+	glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
 	glUseProgram(gs.program);
 	glBindVertexArray(gs.vao);
 	{
@@ -748,9 +805,19 @@ void render(GLFWwindow* window)
 		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
 		glUniform1i(texLoc, 2);
 		
-		//glProgramUniform4f(gs.program, 1, gs.p.x, gs.p.y, gs.p.z, gs.p.w);
 		glDrawArrays(GL_TRIANGLES, 0, gs.size);
 		//glDrawElements()
+	}
+
+	glProgramUniformMatrix4fv(gs.program_shadow, 1, 1, GL_FALSE, &mvp[0][0]);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glUseProgram(gs.program_shadow);
+	glBindVertexArray(gs.vao_shadow);
+	{
+		GLuint texLoc = glGetUniformLocation(gs.program_shadow, "shadow_sampler");
+		glUniform1i(texLoc, 3);
+		glDrawArrays(GL_TRIANGLES, 0, gs.cube_size);
 	}
 
 	glBindVertexArray(0);
