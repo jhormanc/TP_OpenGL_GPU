@@ -2,8 +2,10 @@
 
 layout(location = 0) out float fragment_depth;
 
+in vec4 pos;
+
 void main()
 {
-	//texture(texture_sampler[num_texture], uv_out).z;
 	fragment_depth = gl_FragCoord.z; 
+	//fragment_depth = (pos.z / pos.w) * 0.5 + 0.5;
 }

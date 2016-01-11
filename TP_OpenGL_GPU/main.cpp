@@ -548,19 +548,19 @@ void init()
 	glEnable(GL_CULL_FACE);
 	glClearDepth(1.0f); // Set background depth to farthest
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for z-culling
-	glDepthFunc(GL_LEQUAL); // Set the type of depth-test
+	glDepthFunc(GL_LESS); // Set the type of depth-test
 	glShadeModel(GL_SMOOTH); // Enable smooth shading
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST); // Nice perspective corrections
 
 	// Build our program and an empty VAO
 	gs.program = buildProgram("basic.vsl", "basic.fsl");
-	gs.program_fbo = buildProgram("basic.vsl", "texture.fsl");
+	gs.program_fbo = buildProgram("texture.vsl", "texture.fsl");
 
 	// Global parameters
 	gs.start = clock();
 	gs.p = glm::vec4(0.f, 1.f, 0.f, 0.f);
 	gs.camPos = glm::vec3(0.f, 1.f, -7.f); 
-	gs.lightPos = glm::vec3(0.5f, 2, 2); // 0.f, 5.f, 0.f
+	gs.lightPos = glm::vec3(2.f, 5.f, -3.f); // 0.f, 5.f, 0.f
 	gs.near = 0.1f;
 	gs.far = 100.f;
 	gs.fov = 45.f;
@@ -568,7 +568,7 @@ void init()
 	float cube_size = 10.f;
 	float size = cube_size * 0.85f;
 
-	Mesh *mesh = createMesh("Cube.obj", false, 1, glm::vec3(0.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
+	Mesh *mesh = createMesh("Cube.obj", false, 1, glm::vec3(0.f, 0.25f + cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
 	//Mesh *mesh = createMesh("Stormtrooper.obj", false, 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
@@ -721,8 +721,8 @@ void init()
 		glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
 		
 		// Instruct openGL that we won't bind a color texture with the currently bound FBO
-		/*glDrawBuffer(GL_NONE);
-		glReadBuffer(GL_NONE);*/
+		glDrawBuffer(GL_NONE);
+		glReadBuffer(GL_NONE);
 
 		// attach the texture to FBO depth attachment point
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gs.renderedTexture, 0);
@@ -772,11 +772,10 @@ void render(GLFWwindow* window)
 	//glProgramUniform1f(gs.program, 5, std::abs(cos(c)));
 
 	glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
-	glm::mat4x4 mvp;
 	glm::mat4x4 projection = glm::perspective(glm::radians(gs.fov), (float)(WIDTH / (float)HEIGHT), gs.near, gs.far);
 	glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
 	glm::mat4x4 model = glm::mat4(1.0f);
-	mvp = projection * view * model;
+	glm::mat4x4 mvp = projection * view * model;
 
 	// Compute the MVP matrix from the light's point of view
 	glm::mat4 depthProjectionMatrix = glm::perspective(glm::radians(gs.fov), (float)(WIDTH / (float)HEIGHT), gs.near, gs.far); //glm::ortho<float>(-10, 10, -10, 10, -10, 20);
@@ -791,44 +790,44 @@ void render(GLFWwindow* window)
 		0.5f, 0.5f, 0.5f, 1.0f
 		);
 	glm::mat4 depthBiasMVP = biasMatrix * depthMVP;
+
 	GLuint texLoc;
 
-	glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
+	glProgramUniformMatrix4fv(gs.program_fbo, 1, 1, GL_FALSE, &depthMVP[0][0]);
+
+	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
+	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &model[0][0]);
+	glProgramUniformMatrix4fv(gs.program, 3, 1, GL_FALSE, &view[0][0]);
+	glProgramUniform3fv(gs.program, 4, 1, &gs.lightPos[0]);
+	glProgramUniformMatrix4fv(gs.program, 5, 1, GL_FALSE, &depthBiasMVP[0][0]);
+
+	//glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glUseProgram(gs.program_fbo);
 	glBindVertexArray(gs.fbo);
 	{
-		glProgramUniformMatrix4fv(gs.program_fbo, 1, 1, GL_FALSE, &depthMVP[0][0]);
 		glDrawArrays(GL_TRIANGLES, 0, gs.size);
 	}
-	
+
+	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	//glUseProgram(gs.program);
+	//glBindVertexArray(gs.vao);
+	//{
+	//	texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
+	//	glUniform1i(texLoc, 0);
+	//	texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
+	//	glUniform1i(texLoc, 1);
+	//	texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
+	//	glUniform1i(texLoc, 2);
+	//	GLuint texLoc = glGetUniformLocation(gs.program, "shadow_map");
+	//	glUniform1i(texLoc, 3);
+	//	
+	//	glDrawArrays(GL_TRIANGLES, 0, gs.size);
+	//	//glDrawElements()
+	//}
+
 	gs.camPos.x = 5.f * cos(c);
 	gs.camPos.z = 5.f * sin(c);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glUseProgram(gs.program);
-	glBindVertexArray(gs.vao);
-	{
-		glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
-		glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &model[0][0]);
-		glProgramUniformMatrix4fv(gs.program, 3, 1, GL_FALSE, &view[0][0]);
-		glProgramUniform3fv(gs.program, 4, 1, &gs.lightPos[0]);
-		// Send our transformation to the currently bound shader, in the "MVP" uniform
-		glProgramUniformMatrix4fv(gs.program, 5, 1, GL_FALSE, &depthBiasMVP[0][0]);
-
-		texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
-		glUniform1i(texLoc, 0);
-		texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
-		glUniform1i(texLoc, 1);
-		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
-		glUniform1i(texLoc, 2);
-		GLuint texLoc = glGetUniformLocation(gs.program, "shadow_map");
-		glUniform1i(texLoc, 3);
-		
-		glDrawArrays(GL_TRIANGLES, 0, gs.size);
-		//glDrawElements()
-	}
-
-	
 
 	glBindVertexArray(0);
 	glUseProgram(0);

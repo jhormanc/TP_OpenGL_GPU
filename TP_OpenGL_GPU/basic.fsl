@@ -70,7 +70,7 @@ void main()
 	c_out.y = pow(c_out.y, 1 / 2.2);
 	c_out.z = pow(c_out.z, 1 / 2.2);
 
-	color_out = vec4(vec3(1, 1, 1) * distFromLight, 1);
-	//color_out = c_out; //vec4(vec3(1, 1, 1) * texture(shadow_map, coord.xy).z, 1);
+	//color_out = vec4(vec3(1, 1, 1) * distFromLight, 1);
+	color_out = c_out; //vec4(vec3(1, 1, 1) * texture(shadow_map, coord.xy).z, 1);
 	//color_out = vec4(coord.x, coord.y, texture(shadow_map, coord.xy).z, 1);
 }

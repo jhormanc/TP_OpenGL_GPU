@@ -127,6 +127,7 @@
     <None Include="shadow.fsl" />
     <None Include="shadow.vsl" />
     <None Include="texture.fsl" />
+    <None Include="texture.vsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
