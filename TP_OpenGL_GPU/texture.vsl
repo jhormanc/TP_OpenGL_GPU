@@ -4,7 +4,6 @@ layout(location = 1) uniform mat4x4 depthMVP;
 
 layout(location = 11) in vec4 pt;
 
-out vec2 uv_out;
 out vec4 pos;
 
 void main()

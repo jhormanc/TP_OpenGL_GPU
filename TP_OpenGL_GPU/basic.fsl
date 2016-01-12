@@ -16,7 +16,7 @@ uniform sampler2D shadow_map;
 vec4 light_color = vec4(1, 1, 1, 1);
 vec4 diffus = vec4(1, 1, 1, 1);
 vec4 specular = vec4(1, 1, 1, 1);
-float light_power = 10;
+float light_power = 50;
 float ambient_power = 0.1;
 
 void main()
@@ -53,7 +53,7 @@ void main()
 	vec4 coord = shadow_coord / shadow_coord.w;
 	
 	// Used to lower moiré pattern and self-shadowing
-	coord.z += 0.0005;
+	//coord.z += 0.0005;
 
 	float distFromLight = texture(shadow_map, coord.xy).z;
 		
@@ -70,7 +70,7 @@ void main()
 	c_out.y = pow(c_out.y, 1 / 2.2);
 	c_out.z = pow(c_out.z, 1 / 2.2);
 
-	//color_out = vec4(vec3(1, 1, 1) * distFromLight, 1);
-	color_out = c_out; //vec4(vec3(1, 1, 1) * texture(shadow_map, coord.xy).z, 1);
+	color_out = vec4(vec3(1, 1, 1) * distFromLight, 1);
+	//color_out = c_out; //vec4(vec3(1, 1, 1) * texture(shadow_map, coord.xy).z, 1);
 	//color_out = vec4(coord.x, coord.y, texture(shadow_map, coord.xy).z, 1);
 }

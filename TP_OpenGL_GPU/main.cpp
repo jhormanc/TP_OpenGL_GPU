@@ -543,9 +543,9 @@ Mesh* createMesh(const char* filename, const bool index_data, GLushort num_textu
 void init()
 {
 	glClearColor(0.f, 0.f, 0.f, 1.f);
-	glCullFace(GL_BACK);
+	/*glCullFace(GL_BACK);
 	glFrontFace(GL_CCW);
-	glEnable(GL_CULL_FACE);
+	glEnable(GL_CULL_FACE);*/
 	glClearDepth(1.0f); // Set background depth to farthest
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for z-culling
 	glDepthFunc(GL_LESS); // Set the type of depth-test
@@ -559,8 +559,8 @@ void init()
 	// Global parameters
 	gs.start = clock();
 	gs.p = glm::vec4(0.f, 1.f, 0.f, 0.f);
-	gs.camPos = glm::vec3(0.f, 1.f, -7.f); 
-	gs.lightPos = glm::vec3(2.f, 5.f, -3.f); // 0.f, 5.f, 0.f
+	gs.camPos = glm::vec3(0.f, 3.f, -7.f); 
+	gs.lightPos = glm::vec3(2.f, 5.f, -3.f); // 0.f, 5.f, 0.f // 2.f, 5.f, -3.f
 	gs.near = 0.1f;
 	gs.far = 100.f;
 	gs.fov = 45.f;
@@ -568,7 +568,7 @@ void init()
 	float cube_size = 10.f;
 	float size = cube_size * 0.85f;
 
-	Mesh *mesh = createMesh("Cube.obj", false, 1, glm::vec3(0.f, 0.25f + cube_size * 0.11f, 0.f), glm::vec3(1.f));
+	Mesh *mesh = createMesh("Cube.obj", false, 1, glm::vec3(0.f, 0.10f + cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
 	//Mesh *mesh = createMesh("Stormtrooper.obj", false, 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
@@ -686,20 +686,21 @@ void init()
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
 		glBindSampler(0, gs.texturesSamplerBuffer[0]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
-		//glDisable(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, 0);
 
 		glActiveTexture(GL_TEXTURE1);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
 		glBindSampler(1, gs.texturesSamplerBuffer[1]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
+		glBindTexture(GL_TEXTURE_2D, 0);
 
 		glActiveTexture(GL_TEXTURE2);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[2]);
 		glBindSampler(2, gs.texturesSamplerBuffer[2]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
-		//glDisable(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, 0);
 
 		// The texture we're going to render to
 		glGenTextures(1, &gs.renderedTexture);
@@ -719,10 +720,10 @@ void init()
 
 		glGenFramebuffers(1, &gs.framebuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
-		
+
 		// Instruct openGL that we won't bind a color texture with the currently bound FBO
-		glDrawBuffer(GL_NONE);
-		glReadBuffer(GL_NONE);
+		//glDrawBuffer(GL_NONE);
+		//glReadBuffer(GL_NONE);
 
 		// attach the texture to FBO depth attachment point
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gs.renderedTexture, 0);
@@ -736,6 +737,10 @@ void init()
 		glActiveTexture(GL_TEXTURE3);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
+		GLuint shadowSampler;
+		glGenSamplers(1, &shadowSampler);
+		glBindSampler(3, shadowSampler);
+		glBindTexture(GL_TEXTURE_2D, 0);
 
 		glBindVertexArray(0);
 
@@ -778,7 +783,7 @@ void render(GLFWwindow* window)
 	glm::mat4x4 mvp = projection * view * model;
 
 	// Compute the MVP matrix from the light's point of view
-	glm::mat4 depthProjectionMatrix = glm::perspective(glm::radians(gs.fov), (float)(WIDTH / (float)HEIGHT), gs.near, gs.far); //glm::ortho<float>(-10, 10, -10, 10, -10, 20);
+	glm::mat4 depthProjectionMatrix = glm::ortho<float>(-10, 10, -10, 10, -10, 20);// glm::perspective(glm::radians(gs.fov), (float)(WIDTH / (float)HEIGHT), gs.near, gs.far); //glm::ortho<float>(-10, 10, -10, 10, -10, 20);
 	glm::mat4 depthViewMatrix = glm::lookAt(gs.lightPos, glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f));
 	glm::mat4 depthModelMatrix = glm::mat4(1.0f);
 	glm::mat4 depthMVP = depthProjectionMatrix * depthViewMatrix * depthModelMatrix;
@@ -789,11 +794,30 @@ void render(GLFWwindow* window)
 		0.0f, 0.0f, 0.5f, 0.0f,
 		0.5f, 0.5f, 0.5f, 1.0f
 		);
+
 	glm::mat4 depthBiasMVP = biasMatrix * depthMVP;
 
 	GLuint texLoc;
 
+	//Disable color rendering, we only want to write to the Z-Buffer
+	//glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+
+	//glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glUseProgram(gs.program_fbo);
+
 	glProgramUniformMatrix4fv(gs.program_fbo, 1, 1, GL_FALSE, &depthMVP[0][0]);
+	
+	glBindVertexArray(gs.fbo);
+	{
+		glDrawArrays(GL_TRIANGLES, 0, gs.size);
+	}
+
+	//Enabling color write (previously disabled for light POV z-buffer rendering)
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glUseProgram(gs.program);
 
 	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
 	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &model[0][0]);
@@ -801,30 +825,20 @@ void render(GLFWwindow* window)
 	glProgramUniform3fv(gs.program, 4, 1, &gs.lightPos[0]);
 	glProgramUniformMatrix4fv(gs.program, 5, 1, GL_FALSE, &depthBiasMVP[0][0]);
 
-	//glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glUseProgram(gs.program_fbo);
-	glBindVertexArray(gs.fbo);
+	glBindVertexArray(gs.vao);
 	{
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
+		glUniform1i(texLoc, 0);
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
+		glUniform1i(texLoc, 1);
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
+		glUniform1i(texLoc, 2);
+		GLuint texLoc = glGetUniformLocation(gs.program, "shadow_map");
+		glUniform1i(texLoc, 3);
+		
 		glDrawArrays(GL_TRIANGLES, 0, gs.size);
+		//glDrawElements()
 	}
-
-	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	//glUseProgram(gs.program);
-	//glBindVertexArray(gs.vao);
-	//{
-	//	texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
-	//	glUniform1i(texLoc, 0);
-	//	texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
-	//	glUniform1i(texLoc, 1);
-	//	texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
-	//	glUniform1i(texLoc, 2);
-	//	GLuint texLoc = glGetUniformLocation(gs.program, "shadow_map");
-	//	glUniform1i(texLoc, 3);
-	//	
-	//	glDrawArrays(GL_TRIANGLES, 0, gs.size);
-	//	//glDrawElements()
-	//}
 
 	gs.camPos.x = 5.f * cos(c);
 	gs.camPos.z = 5.f * sin(c);
