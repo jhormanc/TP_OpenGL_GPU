@@ -13,8 +13,8 @@
 #include <GLFW\glfw3.h>
 #include <GL\GL.h>
 
-#include <glm\glm\glm.hpp>
-#include <glm\glm\gtx\transform.hpp>
+#include <glm\glm.hpp>
+#include <glm\gtx\transform.hpp>
 
 #include <soil\SOIL.h>
 
@@ -403,7 +403,7 @@ int main(void)
 	glEnable(GL_DEBUG_OUTPUT);
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 
-	glDebugMessageCallback((GLDEBUGPROC)debug, nullptr);
+	glDebugMessageCallback(debug, nullptr);
 
 	// This is our openGL init function which creates ressources
 	init();
@@ -543,9 +543,9 @@ Mesh* createMesh(const char* filename, const bool index_data, GLushort num_textu
 void init()
 {
 	glClearColor(0.f, 0.f, 0.f, 1.f);
-	/*glCullFace(GL_BACK);
-	glFrontFace(GL_CCW);
-	glEnable(GL_CULL_FACE);*/
+	//glCullFace(GL_BACK);
+	//glFrontFace(GL_CCW);
+	//glEnable(GL_CULL_FACE);
 	glClearDepth(1.0f); // Set background depth to farthest
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for z-culling
 	glDepthFunc(GL_LESS); // Set the type of depth-test
@@ -554,13 +554,13 @@ void init()
 
 	// Build our program and an empty VAO
 	gs.program = buildProgram("basic.vsl", "basic.fsl");
-	gs.program_fbo = buildProgram("texture.vsl", "texture.fsl");
+	gs.program_fbo = buildProgram("basic.vsl", "texture.fsl");
 
 	// Global parameters
 	gs.start = clock();
 	gs.p = glm::vec4(0.f, 1.f, 0.f, 0.f);
 	gs.camPos = glm::vec3(0.f, 3.f, -7.f); 
-	gs.lightPos = glm::vec3(2.f, 5.f, -3.f); // 0.f, 5.f, 0.f // 2.f, 5.f, -3.f
+	gs.lightPos = glm::vec3(2.f, 5.f, -3.f); // 0.f, 5.f, 0.f
 	gs.near = 0.1f;
 	gs.far = 100.f;
 	gs.fov = 45.f;
@@ -568,9 +568,9 @@ void init()
 	float cube_size = 10.f;
 	float size = cube_size * 0.85f;
 
-	Mesh *mesh = createMesh("Cube.obj", false, 1, glm::vec3(0.f, 0.10f + cube_size * 0.11f, 0.f), glm::vec3(1.f));
+	//Mesh *mesh = createMesh("Cube.obj", false, 1, glm::vec3(0.f, 0.10f + cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
-	//Mesh *mesh = createMesh("Stormtrooper.obj", false, 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
+	Mesh *mesh = createMesh("Stormtrooper.obj", false, 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
 	if (mesh != nullptr)
 	{
@@ -578,7 +578,7 @@ void init()
 		if (cube != nullptr)
 		{
 			mesh->merge(cube);
-			/*translate(cube->vertices, glm::vec3(2.f * size, size * 2.f, 0.f));
+			translate(cube->vertices, glm::vec3(2.f * size, size * 2.f, 0.f));
 			mesh->merge(cube);
 			translate(cube->vertices, glm::vec3(-2.f * size, 0.f, 2.f * size));
 			mesh->merge(cube);
@@ -587,14 +587,14 @@ void init()
 			translate(cube->vertices, glm::vec3(2.f * size, 0.f, -2.f * size));
 			mesh->merge(cube);
 			translate(cube->vertices, glm::vec3(0.f, 2.f * size, 2.f * size));
-			mesh->merge(cube);*/
+			mesh->merge(cube);
 		}
 
-		/*Mesh *dragon = createMesh("Alduin.obj", false, 2, glm::vec3(-4.f, cube_size * 0.2f, 0.f), glm::vec3(1.f));
+		Mesh *dragon = createMesh("Alduin.obj", false, 2, glm::vec3(-4.f, cube_size * 0.2f, 0.f), glm::vec3(1.f));
 		if (dragon != nullptr)
 		{
 			mesh->merge(dragon);
-		}*/
+		}
 	}
 
 	if (mesh != nullptr)
@@ -653,9 +653,45 @@ void init()
 		glVertexAttribIPointer(14, 1, GL_INT, 0, (void *)0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+		// Depth texture
+		glGenTextures(1, &gs.renderedTexture);
+		// "Bind" the newly created texture : all future texture functions will modify this texture
+		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
+
+		glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, WIDTH, HEIGHT);
+
+		// GL_LINEAR does not make sense for depth texture. However, next tutorial shows usage of GL_LINEAR and PCF
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+		//// Remove artifact on the edges of the shadowmap
+		//glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		//glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+		glGenFramebuffers(1, &gs.framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
+
+		// Instruct openGL that we won't bind a color texture with the currently bound FBO
+		//glDrawBuffer(GL_NONE);
+		//glReadBuffer(GL_NONE);
+
+		// attach the texture to FBO depth attachment point
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gs.renderedTexture, 0);
+
+		// Always check that our framebuffer is ok
+		assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+		// Render to our framebuffer
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		glActiveTexture(GL_TEXTURE0);
+		//glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
+		glBindTexture(GL_TEXTURE_2D, 0);
+
 		// Textures
-		glGenTextures(2, gs.texturesBuffer);
-		glGenSamplers(2, gs.texturesSamplerBuffer);
+		glGenTextures(3, gs.texturesBuffer);
+		glGenSamplers(3, gs.texturesSamplerBuffer);
 
 		gs.texturesBuffer[0] = SOIL_load_OGL_texture
 			(
@@ -681,65 +717,25 @@ void init()
 			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
 			);
 
-		glActiveTexture(GL_TEXTURE0);
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
-		glBindSampler(0, gs.texturesSamplerBuffer[0]);
-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
-		glBindTexture(GL_TEXTURE_2D, 0);
-
 		glActiveTexture(GL_TEXTURE1);
 		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
-		glBindSampler(1, gs.texturesSamplerBuffer[1]);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
+		glBindSampler(1, gs.texturesSamplerBuffer[0]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 		glBindTexture(GL_TEXTURE_2D, 0);
 
 		glActiveTexture(GL_TEXTURE2);
 		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[2]);
-		glBindSampler(2, gs.texturesSamplerBuffer[2]);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
+		glBindSampler(2, gs.texturesSamplerBuffer[1]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 		glBindTexture(GL_TEXTURE_2D, 0);
 
-		// The texture we're going to render to
-		glGenTextures(1, &gs.renderedTexture);
-		// "Bind" the newly created texture : all future texture functions will modify this texture
-		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
-
-		// GL_LINEAR does not make sense for depth texture. However, next tutorial shows usage of GL_LINEAR and PCF
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-		// Remove artifact on the edges of the shadowmap
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, WIDTH, HEIGHT, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, 0);
-		glBindTexture(GL_TEXTURE_2D, 0);
-		//glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, WIDTH, HEIGHT);
-
-		glGenFramebuffers(1, &gs.framebuffer);
-		glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
-
-		// Instruct openGL that we won't bind a color texture with the currently bound FBO
-		//glDrawBuffer(GL_NONE);
-		//glReadBuffer(GL_NONE);
-
-		// attach the texture to FBO depth attachment point
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gs.renderedTexture, 0);
-
-		// Always check that our framebuffer is ok
-		assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-
-		// Render to our framebuffer
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 		glActiveTexture(GL_TEXTURE3);
 		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
-		GLuint shadowSampler;
-		glGenSamplers(1, &shadowSampler);
-		glBindSampler(3, shadowSampler);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[2]);
+		glBindSampler(3, gs.texturesSamplerBuffer[2]);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 		glBindTexture(GL_TEXTURE_2D, 0);
 
 		glBindVertexArray(0);
@@ -783,10 +779,11 @@ void render(GLFWwindow* window)
 	glm::mat4x4 mvp = projection * view * model;
 
 	// Compute the MVP matrix from the light's point of view
-	glm::mat4 depthProjectionMatrix = glm::ortho<float>(-10, 10, -10, 10, -10, 20);// glm::perspective(glm::radians(gs.fov), (float)(WIDTH / (float)HEIGHT), gs.near, gs.far); //glm::ortho<float>(-10, 10, -10, 10, -10, 20);
+	//glm::mat4 depthProjectionMatrix = glm::perspective(glm::radians(gs.fov), (float)(WIDTH / (float)HEIGHT), gs.near, gs.far); //glm::ortho<float>(-10, 10, -10, 10, -10, 20);
 	glm::mat4 depthViewMatrix = glm::lookAt(gs.lightPos, glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f));
-	glm::mat4 depthModelMatrix = glm::mat4(1.0f);
-	glm::mat4 depthMVP = depthProjectionMatrix * depthViewMatrix * depthModelMatrix;
+	//glm::mat4 depthModelMatrix = glm::mat4(1.0f);
+	//glm::mat4 depthMVP = depthProjectionMatrix * depthViewMatrix * depthModelMatrix;
+	glm::mat4 depthMVP = projection * depthViewMatrix * model;
 
 	glm::mat4 biasMatrix(
 		0.5f, 0.0f, 0.0f, 0.0f,
@@ -794,29 +791,27 @@ void render(GLFWwindow* window)
 		0.0f, 0.0f, 0.5f, 0.0f,
 		0.5f, 0.5f, 0.5f, 1.0f
 		);
-
 	glm::mat4 depthBiasMVP = biasMatrix * depthMVP;
 
 	GLuint texLoc;
-
-	//Disable color rendering, we only want to write to the Z-Buffer
-	//glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
 	//glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glUseProgram(gs.program_fbo);
 
 	glProgramUniformMatrix4fv(gs.program_fbo, 1, 1, GL_FALSE, &depthMVP[0][0]);
-	
-	glBindVertexArray(gs.fbo);
+
+	glBindVertexArray(gs.vao);
 	{
 		glDrawArrays(GL_TRIANGLES, 0, gs.size);
 	}
 
-	//Enabling color write (previously disabled for light POV z-buffer rendering)
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glBindVertexArray(0);
+	glUseProgram(0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glUseProgram(gs.program);
 
 	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
@@ -827,13 +822,13 @@ void render(GLFWwindow* window)
 
 	glBindVertexArray(gs.vao);
 	{
-		texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
+		texLoc = glGetUniformLocation(gs.program, "shadow_map");
 		glUniform1i(texLoc, 0);
-		texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
 		glUniform1i(texLoc, 1);
-		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
 		glUniform1i(texLoc, 2);
-		GLuint texLoc = glGetUniformLocation(gs.program, "shadow_map");
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
 		glUniform1i(texLoc, 3);
 		
 		glDrawArrays(GL_TRIANGLES, 0, gs.size);
