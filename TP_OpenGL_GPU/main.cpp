@@ -687,7 +687,6 @@ void init()
 		glActiveTexture(GL_TEXTURE0);
 		//glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
-		glBindTexture(GL_TEXTURE_2D, 0);
 
 		// Textures
 		glGenTextures(3, gs.texturesBuffer);
@@ -722,21 +721,18 @@ void init()
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
 		glBindSampler(1, gs.texturesSamplerBuffer[0]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
-		glBindTexture(GL_TEXTURE_2D, 0);
 
 		glActiveTexture(GL_TEXTURE2);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
 		glBindSampler(2, gs.texturesSamplerBuffer[1]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
-		glBindTexture(GL_TEXTURE_2D, 0);
 
 		glActiveTexture(GL_TEXTURE3);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[2]);
 		glBindSampler(3, gs.texturesSamplerBuffer[2]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
-		glBindTexture(GL_TEXTURE_2D, 0);
 
 		glBindVertexArray(0);
 

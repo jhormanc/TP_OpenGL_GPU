@@ -12,7 +12,7 @@ flat in int num_texture;
 in vec4 shadow_coord;
 
 uniform sampler2D texture_sampler[3];
-layout(binding = 0) uniform sampler2D shadow_map;
+uniform sampler2D shadow_map;
 vec4 light_color = vec4(1, 1, 1, 1);
 vec4 diffus = vec4(1, 1, 1, 1);
 vec4 specular = vec4(1, 1, 1, 1);
