@@ -14,7 +14,8 @@
 #include <GL\GL.h>
 
 #include <glm\glm.hpp>
-#include <glm\gtx\transform.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+//#include <glm\gtx\transform.hpp>
 
 #include <soil\SOIL.h>
 
@@ -630,9 +631,9 @@ Mesh* createMesh(const char* filename, const bool index_data, GLushort num_textu
 void init()
 {
 	glClearColor(0.f, 0.f, 0.f, 1.f);
-	//glCullFace(GL_BACK);
-	//glFrontFace(GL_CCW);
-	//glEnable(GL_CULL_FACE);
+	/*glCullFace(GL_BACK);
+	glFrontFace(GL_CCW);
+	glEnable(GL_CULL_FACE);*/
 	glClearDepth(1.0f); // Set background depth to farthest
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for z-culling
 	glDepthFunc(GL_LESS); // Set the type of depth-test
@@ -649,8 +650,8 @@ void init()
 	gs.camPos = glm::vec3(0.f, 3.f, -7.f); 
 	gs.lightPos = glm::vec3(2.f, 5.f, -3.f); // 0.f, 5.f, 0.f
 	gs.near = 0.1f;
-	gs.far = 100.f;
-	gs.fov = 45.f;
+	gs.far = 1000.f;
+	gs.fov = 90.f;
 
 	float cube_size = 10.f;
 	float size = cube_size * 0.85f;
@@ -868,11 +869,11 @@ void render(GLFWwindow* window)
 	glm::mat4x4 mvp = projection * view * model;
 
 	// Compute the MVP matrix from the light's point of view
-	//glm::mat4 depthProjectionMatrix = glm::perspective(glm::radians(gs.fov), (float)(WIDTH / (float)HEIGHT), gs.near, gs.far); //glm::ortho<float>(-10, 10, -10, 10, -10, 20);
+	glm::mat4 depthProjectionMatrix = glm::ortho<float>(-10.f, 10.f, -10.f, 10.f, 1.f, 20.f); // glm::perspective(glm::radians(gs.fov), (float)(WIDTH / (float)HEIGHT), gs.near, gs.far); //glm::ortho<float>(-10, 10, -10, 10, -10, 20);
 	glm::mat4 depthViewMatrix = glm::lookAt(gs.lightPos, glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f));
 	//glm::mat4 depthModelMatrix = glm::mat4(1.0f);
 	//glm::mat4 depthMVP = depthProjectionMatrix * depthViewMatrix * depthModelMatrix;
-	glm::mat4 depthMVP = projection * depthViewMatrix * model;
+	glm::mat4 depthMVP = depthProjectionMatrix * depthViewMatrix * model;
 
 	glm::mat4 biasMatrix(
 		0.5f, 0.0f, 0.0f, 0.0f,
@@ -931,6 +932,8 @@ void render(GLFWwindow* window)
 
 	gs.camPos.x = 5.f * cos(c);
 	gs.camPos.z = 5.f * sin(c);
+
+	//gs.lightPos = glm::vec3(5.f * sin(c), 0.9f, 5.f * cos(c));
 
 	glBindVertexArray(0);
 	glUseProgram(0);
