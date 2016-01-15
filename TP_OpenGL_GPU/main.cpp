@@ -56,26 +56,26 @@ struct Mesh
 	std::vector<glm::vec4> vertices_indexed;
 	std::vector<glm::vec2> textures_indexed;
 	std::vector<glm::vec3> normals_indexed;
-	std::vector<GLint> verticesIndex;
-	std::vector<GLint> texturesIndex;
-	std::vector<GLint> normalsIndex;
-	std::vector<GLint> texturesNumber;
-	std::vector<GLint> texturesNumber_indexed;
+	std::vector<GLuint> verticesIndex;
+	std::vector<GLuint> texturesIndex;
+	std::vector<GLuint> normalsIndex;
+	std::vector<GLuint> texturesNumber;
+	std::vector<GLuint> texturesNumber_indexed;
 
 	Mesh() :
 		vertices(std::vector<glm::vec4>()),
 		textures(std::vector<glm::vec2>()),
 		normals(std::vector<glm::vec3>()),
-		verticesIndex(std::vector<GLint>()),
-		texturesIndex(std::vector<GLint>()),
-		normalsIndex(std::vector<GLint>()),
-		texturesNumber(std::vector<GLint>())
+		verticesIndex(std::vector<GLuint>()),
+		texturesIndex(std::vector<GLuint>()),
+		normalsIndex(std::vector<GLuint>()),
+		texturesNumber(std::vector<GLuint>())
 	{
 
 	}
 
 	Mesh(std::vector<glm::vec4> _vertices, std::vector<glm::vec2> _textures, std::vector<glm::vec3> _normals, 
-		std::vector<GLint> _verticesIndex, std::vector<GLint> _texturesIndex, std::vector<GLint> _normalsIndex, std::vector<GLint> _texturesNumber) :
+		std::vector<GLuint> _verticesIndex, std::vector<GLuint> _texturesIndex, std::vector<GLuint> _normalsIndex, std::vector<GLuint> _texturesNumber) :
 		vertices(_vertices),
 		textures(_textures),
 		normals(_normals),
@@ -115,7 +115,7 @@ struct Mesh
 			texturesNumber.push_back(m->texturesNumber[i]);
 	}
 
-	static Mesh* Quadrangle(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3)
+	static Mesh* Quadrangle(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, const int num_texture)
 	{
 		std::vector<glm::vec4> points(4);
 		points[0] = glm::vec4(p0.x, p0.y, p0.z, 1.f);
@@ -123,7 +123,7 @@ struct Mesh
 		points[2] = glm::vec4(p2.x, p2.y, p2.z, 1.f);
 		points[3] = glm::vec4(p3.x, p3.y, p3.z, 1.f);
 
-		std::vector<GLint> faces(6);
+		std::vector<GLuint> faces(6);
 		faces[0] = 1;
 		faces[1] = 2;
 		faces[2] = 3;
@@ -140,7 +140,7 @@ struct Mesh
 		normals[2] = normalMiddle;
 		normals[3] = normalT2;
 
-		std::vector<GLint> facesNormals(6);
+		std::vector<GLuint> facesNormals(6);
 		facesNormals[0] = 1;
 		facesNormals[1] = 2;
 		facesNormals[2] = 3;
@@ -156,7 +156,7 @@ struct Mesh
 		UVTextures[4] = glm::vec2(1, 0);
 		UVTextures[5] = glm::vec2(1, 1);
 
-		std::vector<GLint> texturesIndex(6);
+		std::vector<GLuint> texturesIndex(6);
 		texturesIndex[0] = 1;
 		texturesIndex[1] = 2;
 		texturesIndex[2] = 3;
@@ -164,13 +164,13 @@ struct Mesh
 		texturesIndex[4] = 4;
 		texturesIndex[5] = 3;
 
-		std::vector<GLint> number(6);
-		number[0] = 0;
-		number[1] = 0;
-		number[2] = 0;
-		number[3] = 0;
-		number[4] = 0;
-		number[5] = 0;
+		std::vector<GLuint> number(6);
+		number[0] = num_texture;
+		number[1] = num_texture;
+		number[2] = num_texture;
+		number[3] = num_texture;
+		number[4] = num_texture;
+		number[5] = num_texture;
 
 		return new Mesh(points, UVTextures, normals, faces, facesNormals, texturesIndex, number);
 	}
@@ -180,7 +180,7 @@ struct Mesh
 		vertices_indexed = std::vector<glm::vec4>();
 		textures_indexed = std::vector<glm::vec2>();
 		normals_indexed = std::vector<glm::vec3>();
-		texturesNumber_indexed = std::vector<GLint>();
+		texturesNumber_indexed = std::vector<GLuint>();
 
 		if (vertices.size() > 0)
 		{
@@ -191,7 +191,7 @@ struct Mesh
 					unsigned int vertexIndex = verticesIndex[i];
 					glm::vec4 vertex = vertices[vertexIndex - 1];
 					vertices_indexed.push_back(vertex);
-					GLint num = texturesNumber[vertexIndex - 1];
+					GLuint num = texturesNumber[vertexIndex - 1];
 					texturesNumber_indexed.push_back(num);
 				}
 			}
@@ -310,8 +310,8 @@ void normalizePointList(std::vector<glm::vec4> &points, const glm::vec3 &pos, co
 	}
 }
 
-bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vector<glm::vec2> &textures, std::vector<glm::vec3> &normals, std::vector<GLint> &verticesIndex,
-	std::vector<GLint> &texturesIndex, std::vector<GLint> &normalsIndex, std::vector<GLint> &texturesNumber, GLint num_texture,
+bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vector<glm::vec2> &textures, std::vector<glm::vec3> &normals, std::vector<GLuint> &verticesIndex,
+	std::vector<GLuint> &texturesIndex, std::vector<GLuint> &normalsIndex, std::vector<GLuint> &texturesNumber, GLuint num_texture,
 	const glm::vec3 pos = glm::vec3(0.f), const glm::vec3 scale = glm::vec3(1.f))
 {
 	FILE *file;
@@ -351,7 +351,7 @@ bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vecto
 		}
 		else if (strncmp(line, "f ", 2) == 0)
 		{
-			GLint *vertexIndex = new GLint[3], *uvIndex = new GLint[3], *normalIndex = new GLint[3];
+			GLuint *vertexIndex = new GLuint[3], *uvIndex = new GLuint[3], *normalIndex = new GLuint[3];
 
 			if (std::regex_match(line, obj_regex3))
 			{
@@ -417,9 +417,9 @@ bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vecto
 		normals.resize(vertices.size(), glm::vec3(0.0, 0.0, 0.0));
 		for (unsigned int i = 0; i < verticesIndex.size(); i += 3)
 		{
-			GLushort ia = verticesIndex[i];
-			GLushort ib = verticesIndex[i + 1];
-			GLushort ic = verticesIndex[i + 2];
+			GLuint ia = verticesIndex[i];
+			GLuint ib = verticesIndex[i + 1];
+			GLuint ic = verticesIndex[i + 2];
 			glm::vec3 normal = glm::normalize(glm::cross(
 				glm::vec3(vertices[ib]) - glm::vec3(vertices[ia]),
 				glm::vec3(vertices[ic]) - glm::vec3(vertices[ia])));
@@ -596,9 +596,9 @@ struct
 	glm::vec3 camPos;
 	glm::vec3 lightPos;
 	GLfloat near, far, fov;
-	GLuint buffer;
-	GLuint normalsBuffer;
-	GLuint colorbuffer;
+	GLuint buffer, bufferIndex;
+	GLuint normalsBuffer, normalsBufferIndex;
+	GLuint colorBuffer, colorBufferIndex;
 	GLuint textureNumberBuffer;
 	GLuint texturesBuffer[3];
 	GLuint texturesSamplerBuffer[3];
@@ -642,7 +642,7 @@ void init()
 	gs.camPos = glm::vec3(0.f, 3.f, -7.f); 
 	gs.lightPos = glm::vec3(2.f, 5.f, -3.f); // 2.f, 5.f, -3.f
 	gs.near = 0.1f;
-	gs.far = 200.f;
+	gs.far = 2000.f;
 	gs.fov = 90.f;
 
 	float cube_size = 10.f;
@@ -651,10 +651,10 @@ void init()
 	/*gs.mesh = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
 		glm::vec3(-5.F, -0.5f, 5.F),
 		glm::vec3(5.F, -0.5f, -5.F),
-		glm::vec3(5.F, -0.5f, 5.F)
-		);
+		glm::vec3(5.F, -0.5f, 5.F), 
+		1);
 
-	Mesh *cube = createMesh("Cube.obj", 1, glm::vec3(0.f, 0.10f + cube_size * 0.11f, 0.f), glm::vec3(1.f));
+	Mesh *cube = createMesh("RubiksCube.obj", 1, glm::vec3(0.f, 0.10f + cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
 	gs.mesh->merge(cube);*/
 
@@ -696,22 +696,37 @@ void init()
 		glBufferData(GL_ARRAY_BUFFER, gs.mesh->vertices_indexed.size() * sizeof(glm::vec4), &gs.mesh->vertices_indexed[0], GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+		/*glGenBuffers(1, &gs.bufferIndex);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gs.bufferIndex);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, gs.mesh->verticesIndex.size() * sizeof(GLuint), &gs.mesh->verticesIndex[0], GL_STATIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);*/
+		
 		// Normals buffer
 		glGenBuffers(1, &gs.normalsBuffer);
 		glBindBuffer(GL_ARRAY_BUFFER, gs.normalsBuffer);
 		glBufferData(GL_ARRAY_BUFFER, gs.mesh->normals_indexed.size() * sizeof(glm::vec3), &gs.mesh->normals_indexed[0], GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+		/*glGenBuffers(1, &gs.normalsBufferIndex);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gs.normalsBufferIndex);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, gs.mesh->normalsIndex.size() * sizeof(GLint), &gs.mesh->normalsIndex[0], GL_STATIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);*/
+		
 		// Textures buffer
-		glGenBuffers(1, &gs.colorbuffer);
-		glBindBuffer(GL_ARRAY_BUFFER, gs.colorbuffer);
+		glGenBuffers(1, &gs.colorBuffer);
+		glBindBuffer(GL_ARRAY_BUFFER, gs.colorBuffer);
 		glBufferData(GL_ARRAY_BUFFER, gs.mesh->textures_indexed.size() * sizeof(glm::vec2), &gs.mesh->textures_indexed[0], GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		/*glGenBuffers(1, &gs.colorBufferIndex);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gs.colorBufferIndex);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, gs.mesh->texturesIndex.size() * sizeof(GLint), &gs.mesh->verticesIndex[0], GL_STATIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);*/
 
 		// Texture number buffer
 		glGenBuffers(1, &gs.textureNumberBuffer);
 		glBindBuffer(GL_ARRAY_BUFFER, gs.textureNumberBuffer);
-		glBufferData(GL_ARRAY_BUFFER, gs.mesh->texturesNumber_indexed.size() * sizeof(GLint), &gs.mesh->texturesNumber_indexed[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, gs.mesh->texturesNumber_indexed.size() * sizeof(GLuint), &gs.mesh->texturesNumber_indexed[0], GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 		glCreateVertexArrays(1, &gs.vao);
@@ -730,7 +745,7 @@ void init()
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 		// Vertex shader input vec2 uv
-		glBindBuffer(GL_ARRAY_BUFFER, gs.colorbuffer);
+		glBindBuffer(GL_ARRAY_BUFFER, gs.colorBuffer);
 		glEnableVertexArrayAttrib(gs.vao, 13);
 		glVertexAttribPointer(13, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -748,10 +763,10 @@ void init()
 
 		glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, SHADOW_WIDTH, SHADOW_HEIGHT);
 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
 		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
@@ -879,12 +894,12 @@ void render(GLFWwindow* window)
 	//updateShadowMVP(minX, maxX, minY, maxY, minZ, maxZ, gs.mesh->vertices, model, view, projection);
 
 	// Compute the MVP matrix from the light's point of view
-	glm::mat4 depthProjectionMatrix = glm::perspective(glm::radians(gs.fov), (float)WIDTH / HEIGHT, gs.near, gs.far);
+	//glm::mat4 depthProjectionMatrix = glm::perspective(glm::radians(gs.fov), (float)WIDTH / HEIGHT, gs.near, gs.far);
 	//glm::mat4 depthProjectionMatrix = glm::ortho<float>(minX, maxX, minY, maxY, minZ, maxZ * 100);
 	//glm::mat4 depthProjectionMatrix = glm::ortho<float>(-10.f, 10.f, -10.f, 10.f, -1.0f, 1000.f);
 	glm::mat4 depthViewMatrix = glm::lookAt(glm::vec3(gs.lightPos), glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f));
 	//glm::mat4 depthModelMatrix = glm::mat4(1.0f);
-	glm::mat4 depthMVP = depthProjectionMatrix * depthViewMatrix;// *model;
+	glm::mat4 depthMVP = projection * depthViewMatrix;// *model;
 
 	glm::mat4 biasMatrix(
 		0.5f, 0.0f, 0.0f, 0.0f,
@@ -895,10 +910,10 @@ void render(GLFWwindow* window)
 	glm::mat4 depthBiasMVP = biasMatrix * depthMVP;
 
 	GLuint texLoc;
-
+	
 	glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
 	glUseProgram(gs.program_fbo);
-
+	glCullFace(GL_FRONT);
 	glProgramUniformMatrix4fv(gs.program_fbo, 1, 1, GL_FALSE, &depthMVP[0][0]);
 
 	glBindVertexArray(gs.vao);
@@ -916,9 +931,9 @@ void render(GLFWwindow* window)
 	int width, height;
 	glfwGetFramebufferSize(window, &width, &height);
 	glViewport(0, 0, width, height);
-
+	
 	glUseProgram(gs.program);
-
+	glCullFace(GL_BACK);
 	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
 	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &model[0][0]);
 	glProgramUniformMatrix4fv(gs.program, 3, 1, GL_FALSE, &view[0][0]);
@@ -935,16 +950,19 @@ void render(GLFWwindow* window)
 		glUniform1i(texLoc, 2);
 		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
 		glUniform1i(texLoc, 3);
-		
+
 		glDrawArrays(GL_TRIANGLES, 0, gs.size);
-		//glDrawElements()
+		//glDrawElements(GL_TRIANGLES, gs.mesh->verticesIndex.size(), GL_UNSIGNED_INT, NULL);	
 	}
 
-	gs.camPos.x = 5.f * cos(c);
-	gs.camPos.z = 5.f * sin(c);
 
-	//gs.lightPos = glm::vec3(2.f * sin(c), 1.9f, 2.f * cos(c));
+	/*gs.camPos.x = 5.f * cos(c);
+	gs.camPos.z = 5.f * sin(c);*/
+
+	gs.lightPos = glm::vec3(3.f * sin(c), 3.f, -3.f * cos(c));
 
 	glBindVertexArray(0);
 	glUseProgram(0);
+
+	
 }

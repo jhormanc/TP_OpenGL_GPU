@@ -6,5 +6,6 @@ layout(location = 11) in vec4 pt;
 
 void main()
 {
-	gl_Position = depthMVP * pt;
+	vec4 p = pt / pt.w;
+	gl_Position = depthMVP * p;
 }

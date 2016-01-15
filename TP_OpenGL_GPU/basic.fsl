@@ -45,8 +45,12 @@ void main()
 	float cos_theta = clamp(dot(n, l), 0, 1);
 	float dist = distance(position_worldspace, lightPos_worldspace);
 
-	vec4 color = texture(texture_sampler[num_texture], uv_out).rgba;
-	//vec4 color = vec4(0.7, 0.7, 0.7, 1);
+	vec4 color;
+
+	if(num_texture >= 0)
+		color = texture(texture_sampler[num_texture], uv_out).rgba;
+	else
+		color = vec4(0.7, 0.7, 0.7, 1);
 
 	vec4 ambient = vec4(ambient_power, ambient_power, ambient_power, 1) * color;
 	diffus = color;
@@ -55,12 +59,12 @@ void main()
 	vec4 coord = shadow_coord / shadow_coord.w;
 	
 	// Used to lower moiré pattern and self-shadowing
-	coord.z -= 0.0005;
+	coord.z += 0.0005;
 
 	float distFromLight = texture(shadow_map, coord.xy).z;
 		
 	float shadow = 1.0;
-	if (shadow_coord.w > 0.0)
+	//if (shadow_coord.w > 0.0)
 	 	shadow = distFromLight < coord.z ? 0.5 : 1.0;
 
 	vec4 c_out = ambient // Ambient : simulates indirect lighting
@@ -73,8 +77,5 @@ void main()
 	c_out.z = pow(c_out.z, 1 / 2.2);
 
 	//color_out = texture(shadow_map, coord.xy).rgba;
-
-	//color_out = vec4(vec3(1, 1, 1) * distFromLight, 1);
-	color_out = c_out; //vec4(vec3(1, 1, 1) * texture(shadow_map, coord.xy).z, 1);
-	//color_out = vec4(coord.x, coord.y, texture(shadow_map, coord.xy).z, 1);
+	color_out = c_out;
 }
