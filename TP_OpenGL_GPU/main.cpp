@@ -20,6 +20,8 @@
 
 #define WIDTH 640
 #define HEIGHT 480
+#define SHADOW_WIDTH 1024
+#define SHADOW_HEIGHT 1024
 
 using namespace std;
 
@@ -52,8 +54,33 @@ struct Mesh
 	std::vector<glm::vec3> normals;
 	std::vector<GLushort> verticesIndex;
 	std::vector<GLushort> texturesIndex;
-	std::vector<GLint> texturesNumber;
 	std::vector<GLushort> normalsIndex;
+	std::vector<GLint> texturesNumber;
+
+	Mesh() :
+		vertices(std::vector<glm::vec4>()),
+		textures(std::vector<glm::vec2>()),
+		normals(std::vector<glm::vec3>()),
+		verticesIndex(std::vector<GLushort>()),
+		texturesIndex(std::vector<GLushort>()),
+		normalsIndex(std::vector<GLushort>()),
+		texturesNumber(std::vector<GLint>())
+	{
+
+	}
+
+	Mesh(std::vector<glm::vec4> _vertices, std::vector<glm::vec2> _textures, std::vector<glm::vec3> _normals, 
+		std::vector<GLushort> _verticesIndex, std::vector<GLushort> _texturesIndex, std::vector<GLushort> _normalsIndex, std::vector<GLint> _texturesNumber) :
+		vertices(_vertices),
+		textures(_textures),
+		normals(_normals),
+		verticesIndex(_verticesIndex),
+		texturesIndex(_texturesIndex),
+		normalsIndex(_normalsIndex),
+		texturesNumber(_texturesNumber)
+	{
+
+	}
 
 	void merge(Mesh* m)
 	{
@@ -81,6 +108,66 @@ struct Mesh
 
 		for (int i = 0; i < m->texturesNumber.size(); i++)
 			texturesNumber.push_back(m->texturesNumber[i]);
+	}
+
+	static Mesh* Quadrangle(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3)
+	{
+		std::vector<glm::vec4> points(4);
+		points[0] = glm::vec4(p0.x, p0.y, p0.z, 1.f);
+		points[1] = glm::vec4(p1.x, p1.y, p1.z, 1.f);
+		points[2] = glm::vec4(p2.x, p2.y, p2.z, 1.f);
+		points[3] = glm::vec4(p3.x, p3.y, p3.z, 1.f);
+
+		std::vector<GLushort> faces(6);
+		faces[0] = 1;
+		faces[1] = 2;
+		faces[2] = 3;
+		faces[3] = 2;
+		faces[4] = 4;
+		faces[5] = 3;
+
+		glm::vec3 normalT1 = glm::normalize(glm::cross(p1 - p0, p3 - p0));
+		glm::vec3 normalT2 = glm::normalize(glm::cross(p1 - p2, p3 - p2));
+		glm::vec3 normalMiddle = glm::normalize((normalT1 + normalT2) * 0.5f);
+		std::vector<glm::vec3> normals(4);
+		normals[0] = normalT1;
+		normals[1] = normalMiddle;
+		normals[2] = normalMiddle;
+		normals[3] = normalT2;
+
+		std::vector<GLushort> facesNormals(6);
+		facesNormals[0] = 1;
+		facesNormals[1] = 2;
+		facesNormals[2] = 3;
+		facesNormals[3] = 2;
+		facesNormals[4] = 4;
+		facesNormals[5] = 3;
+
+		std::vector<glm::vec2> UVTextures(6);
+		UVTextures[0] = glm::vec2(0, 1);
+		UVTextures[1] = glm::vec2(0, 0);
+		UVTextures[2] = glm::vec2(1, 1);
+		UVTextures[3] = glm::vec2(0, 0);
+		UVTextures[4] = glm::vec2(1, 0);
+		UVTextures[5] = glm::vec2(1, 1);
+
+		std::vector<GLushort> texturesIndex(6);
+		texturesIndex[0] = 1;
+		texturesIndex[1] = 2;
+		texturesIndex[2] = 3;
+		texturesIndex[3] = 2;
+		texturesIndex[4] = 4;
+		texturesIndex[5] = 3;
+
+		std::vector<GLint> number(6);
+		number[0] = 0;
+		number[1] = 0;
+		number[2] = 0;
+		number[3] = 0;
+		number[4] = 0;
+		number[5] = 0;
+
+		return new Mesh(points, UVTextures, normals, faces, facesNormals, texturesIndex, number);
 	}
 };
 
@@ -373,7 +460,7 @@ int main(void)
 	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 
 	/* Create a windowed mode window and its OpenGL context */
-	window = glfwCreateWindow(WIDTH, HEIGHT, "Open Portal", NULL, NULL);
+	window = glfwCreateWindow(WIDTH, HEIGHT, "Gamagora Portal", NULL, NULL);
 	if (!window)
 	{
 		std::cerr << "Could not init window" << std::endl;
@@ -568,9 +655,17 @@ void init()
 	float cube_size = 10.f;
 	float size = cube_size * 0.85f;
 
-	//Mesh *mesh = createMesh("Cube.obj", false, 1, glm::vec3(0.f, 0.10f + cube_size * 0.11f, 0.f), glm::vec3(1.f));
+	Mesh *mesh = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
+		glm::vec3(-5.F, -0.5f, 5.F),
+		glm::vec3(5.F, -0.5f, -5.F),
+		glm::vec3(5.F, -0.5f, 5.F)
+		);
 
-	Mesh *mesh = createMesh("Stormtrooper.obj", false, 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
+	Mesh *cube = createMesh("Cube.obj", false, 1, glm::vec3(0.f, 0.10f + cube_size * 0.11f, 0.f), glm::vec3(1.f));
+
+	mesh->merge(cube);
+
+	/*Mesh *mesh = createMesh("Stormtrooper.obj", false, 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
 	if (mesh != nullptr)
 	{
@@ -595,7 +690,7 @@ void init()
 		{
 			mesh->merge(dragon);
 		}
-	}
+	}*/
 
 	if (mesh != nullptr)
 	{
@@ -658,7 +753,7 @@ void init()
 		// "Bind" the newly created texture : all future texture functions will modify this texture
 		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
 
-		glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, WIDTH, HEIGHT);
+		glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, SHADOW_WIDTH, SHADOW_HEIGHT);
 
 		// GL_LINEAR does not make sense for depth texture. However, next tutorial shows usage of GL_LINEAR and PCF
 		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -689,50 +784,50 @@ void init()
 		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
 
 		// Textures
-		glGenTextures(3, gs.texturesBuffer);
-		glGenSamplers(3, gs.texturesSamplerBuffer);
+		//glGenTextures(3, gs.texturesBuffer);
+		//glGenSamplers(3, gs.texturesSamplerBuffer);
 
-		gs.texturesBuffer[0] = SOIL_load_OGL_texture
-			(
-			"Stormtrooper.tga",
-			SOIL_LOAD_AUTO,
-			SOIL_CREATE_NEW_ID,
-			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
-			);
+		//gs.texturesBuffer[0] = SOIL_load_OGL_texture
+		//	(
+		//	"Stormtrooper.tga",
+		//	SOIL_LOAD_AUTO,
+		//	SOIL_CREATE_NEW_ID,
+		//	SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
+		//	);
 
-		gs.texturesBuffer[1] = SOIL_load_OGL_texture
-			(
-			"Cube.jpg",
-			SOIL_LOAD_AUTO,
-			SOIL_CREATE_NEW_ID,
-			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
-			);
+		//gs.texturesBuffer[1] = SOIL_load_OGL_texture
+		//	(
+		//	"Cube.jpg",
+		//	SOIL_LOAD_AUTO,
+		//	SOIL_CREATE_NEW_ID,
+		//	SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
+		//	);
 
-		gs.texturesBuffer[2] = SOIL_load_OGL_texture
-			(
-			"Alduin.png",
-			SOIL_LOAD_AUTO,
-			SOIL_CREATE_NEW_ID,
-			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
-			);
+		//gs.texturesBuffer[2] = SOIL_load_OGL_texture
+		//	(
+		//	"Alduin.png",
+		//	SOIL_LOAD_AUTO,
+		//	SOIL_CREATE_NEW_ID,
+		//	SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
+		//	);
 
-		glActiveTexture(GL_TEXTURE1);
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
-		glBindSampler(1, gs.texturesSamplerBuffer[0]);
-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
+		//glActiveTexture(GL_TEXTURE1);
+		//glEnable(GL_TEXTURE_2D);
+		//glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
+		//glBindSampler(1, gs.texturesSamplerBuffer[0]);
+		//glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 
-		glActiveTexture(GL_TEXTURE2);
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
-		glBindSampler(2, gs.texturesSamplerBuffer[1]);
-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
+		//glActiveTexture(GL_TEXTURE2);
+		//glEnable(GL_TEXTURE_2D);
+		//glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
+		//glBindSampler(2, gs.texturesSamplerBuffer[1]);
+		//glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 
-		glActiveTexture(GL_TEXTURE3);
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[2]);
-		glBindSampler(3, gs.texturesSamplerBuffer[2]);
-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
+		//glActiveTexture(GL_TEXTURE3);
+		//glEnable(GL_TEXTURE_2D);
+		//glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[2]);
+		//glBindSampler(3, gs.texturesSamplerBuffer[2]);
+		//glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 
 		glBindVertexArray(0);
 
@@ -759,11 +854,9 @@ void init()
 
 void render(GLFWwindow* window)
 {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_DEPTH_BUFFER_BIT);
 	
-	int width, height;
-	glfwGetFramebufferSize(window, &width, &height);
-	glViewport(0, 0, width, height);
+	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 
 	float c = (float)(clock() - gs.start) / CLOCKS_PER_SEC;
 	//glProgramUniform1f(gs.program, 5, std::abs(cos(c)));
@@ -791,8 +884,8 @@ void render(GLFWwindow* window)
 
 	GLuint texLoc;
 
-	//glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
+	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glUseProgram(gs.program_fbo);
 
 	glProgramUniformMatrix4fv(gs.program_fbo, 1, 1, GL_FALSE, &depthMVP[0][0]);
@@ -808,6 +901,11 @@ void render(GLFWwindow* window)
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	int width, height;
+	glfwGetFramebufferSize(window, &width, &height);
+	glViewport(0, 0, WIDTH, HEIGHT);
+
 	glUseProgram(gs.program);
 
 	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
@@ -820,12 +918,12 @@ void render(GLFWwindow* window)
 	{
 		texLoc = glGetUniformLocation(gs.program, "shadow_map");
 		glUniform1i(texLoc, 0);
-		texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
+		/*texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
 		glUniform1i(texLoc, 1);
 		texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
 		glUniform1i(texLoc, 2);
 		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
-		glUniform1i(texLoc, 3);
+		glUniform1i(texLoc, 3);*/
 		
 		glDrawArrays(GL_TRIANGLES, 0, gs.size);
 		//glDrawElements()
