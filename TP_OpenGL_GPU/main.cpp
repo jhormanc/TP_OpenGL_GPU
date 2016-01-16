@@ -642,23 +642,23 @@ void init()
 	gs.camPos = glm::vec3(0.f, 3.f, -7.f); 
 	gs.lightPos = glm::vec3(2.f, 5.f, -3.f); // 2.f, 5.f, -3.f
 	gs.near = 0.1f;
-	gs.far = 2000.f;
+	gs.far = 100.f;
 	gs.fov = 90.f;
 
 	float cube_size = 10.f;
 	float size = cube_size * 0.85f;
 
-	/*gs.mesh = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
+	gs.mesh = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
 		glm::vec3(-5.F, -0.5f, 5.F),
 		glm::vec3(5.F, -0.5f, -5.F),
 		glm::vec3(5.F, -0.5f, 5.F), 
-		1);
+		-1);
 
 	Mesh *cube = createMesh("RubiksCube.obj", 1, glm::vec3(0.f, 0.10f + cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
-	gs.mesh->merge(cube);*/
+	gs.mesh->merge(cube);
 
-	gs.mesh = createMesh("Stormtrooper.obj", 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
+	/*gs.mesh = createMesh("Stormtrooper.obj", 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
 	if (gs.mesh != nullptr)
 	{
@@ -683,7 +683,7 @@ void init()
 		{
 			gs.mesh->merge(dragon);
 		}
-	}
+	}*/
 
 	if (gs.mesh != nullptr)
 	{
@@ -877,29 +877,19 @@ void updateShadowMVP(float &minX, float &maxX, float &minY, float &maxY, float &
 
 void render(GLFWwindow* window)
 {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
 	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 
 	float c = (float)(clock() - gs.start) / CLOCKS_PER_SEC;
 	//glProgramUniform1f(gs.program, 5, std::abs(cos(c)));
 
-	glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
 	glm::mat4x4 projection = glm::perspective(glm::radians(gs.fov), (float)WIDTH / HEIGHT, gs.near, gs.far);
-	glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
-	glm::mat4x4 model = glm::mat4(1.0f);
-	glm::mat4x4 mvp = projection * view;// *model;
 
 	//float minX, maxX, minY, maxY, minZ, maxZ;
 	//updateShadowMVP(minX, maxX, minY, maxY, minZ, maxZ, gs.mesh->vertices, model, view, projection);
 
 	// Compute the MVP matrix from the light's point of view
-	//glm::mat4 depthProjectionMatrix = glm::perspective(glm::radians(gs.fov), (float)WIDTH / HEIGHT, gs.near, gs.far);
-	//glm::mat4 depthProjectionMatrix = glm::ortho<float>(minX, maxX, minY, maxY, minZ, maxZ * 100);
-	//glm::mat4 depthProjectionMatrix = glm::ortho<float>(-10.f, 10.f, -10.f, 10.f, -1.0f, 1000.f);
 	glm::mat4 depthViewMatrix = glm::lookAt(glm::vec3(gs.lightPos), glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f));
-	//glm::mat4 depthModelMatrix = glm::mat4(1.0f);
-	glm::mat4 depthMVP = projection * depthViewMatrix;// *model;
+	glm::mat4 depthMVP = projection * depthViewMatrix;
 
 	glm::mat4 biasMatrix(
 		0.5f, 0.0f, 0.0f, 0.0f,
@@ -912,8 +902,9 @@ void render(GLFWwindow* window)
 	GLuint texLoc;
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glUseProgram(gs.program_fbo);
-	glCullFace(GL_FRONT);
+
 	glProgramUniformMatrix4fv(gs.program_fbo, 1, 1, GL_FALSE, &depthMVP[0][0]);
 
 	glBindVertexArray(gs.vao);
@@ -924,21 +915,24 @@ void render(GLFWwindow* window)
 	glBindVertexArray(0);
 	glUseProgram(0);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 	int width, height;
 	glfwGetFramebufferSize(window, &width, &height);
 	glViewport(0, 0, width, height);
-	
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
+	glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
+	glm::mat4x4 mvp = projection * view;
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glUseProgram(gs.program);
-	glCullFace(GL_BACK);
+
 	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
-	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &model[0][0]);
-	glProgramUniformMatrix4fv(gs.program, 3, 1, GL_FALSE, &view[0][0]);
+	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &depthBiasMVP[0][0]);
+	glProgramUniform3fv(gs.program, 3, 1, &gs.camPos[0]);
 	glProgramUniform3fv(gs.program, 4, 1, &gs.lightPos[0]);
-	glProgramUniformMatrix4fv(gs.program, 5, 1, GL_FALSE, &depthBiasMVP[0][0]);
 
 	glBindVertexArray(gs.vao);
 	{
@@ -956,10 +950,10 @@ void render(GLFWwindow* window)
 	}
 
 
-	/*gs.camPos.x = 5.f * cos(c);
-	gs.camPos.z = 5.f * sin(c);*/
+	//gs.camPos.x = 5.f * cos(c);
+	//gs.camPos.z = 5.f * sin(c);
 
-	gs.lightPos = glm::vec3(3.f * sin(c), 3.f, -3.f * cos(c));
+	gs.lightPos = glm::vec3(3.f * sin(c), 3.f, 3.f * cos(c));
 
 	glBindVertexArray(0);
 	glUseProgram(0);
