@@ -1,25 +1,27 @@
 #version 430
 
-layout(location = 1) uniform mat4x4 MVP;
-layout(location = 2) uniform mat4x4 MVP_light;
+layout(location = 1) uniform mat4x4 camera;
+layout(location = 2) uniform mat4x4 camera_light;
+layout(location = 3) uniform mat4x4 model;
 
 layout(location = 11) in vec4 pt;
 layout(location = 12) in vec3 normal;
 layout(location = 13) in vec2 uv;
 layout(location = 14) in int num_sampler;
 
-out vec4 pt_out;
-out vec3 normal_out;
-out vec2 uv_out;
-out int num_texture;
+out vec4 frag_pt;
+out vec3 frag_normal;
+out vec2 frag_uv;
+out int frag_texture;
 out vec4 shadow_coord;
 
 void main()
 {
-	pt_out = MVP * pt;
-	gl_Position = pt_out;
-	uv_out = uv;
-	normal_out = normal;
-	num_texture = num_sampler;
-	shadow_coord = MVP_light * pt;
+	vec4 p = pt / pt.w;
+	frag_pt = p;
+	gl_Position = camera * model * p;
+	frag_uv = uv;
+	frag_normal = normal;
+	frag_texture = num_sampler;
+	shadow_coord = camera_light * p;
 }

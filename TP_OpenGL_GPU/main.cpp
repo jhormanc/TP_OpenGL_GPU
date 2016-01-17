@@ -312,7 +312,7 @@ void normalizePointList(std::vector<glm::vec4> &points, const glm::vec3 &pos, co
 
 bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vector<glm::vec2> &textures, std::vector<glm::vec3> &normals, std::vector<GLuint> &verticesIndex,
 	std::vector<GLuint> &texturesIndex, std::vector<GLuint> &normalsIndex, std::vector<GLuint> &texturesNumber, GLuint num_texture,
-	const glm::vec3 pos = glm::vec3(0.f), const glm::vec3 scale = glm::vec3(1.f))
+	const glm::vec3 pos = glm::vec3(0.f), const glm::vec3 scale = glm::vec3(1.f), const bool computeNormals = false)
 {
 	FILE *file;
 	fopen_s(&file, filename, "r");
@@ -412,9 +412,9 @@ bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vecto
 	normalizePointList(vertices, pos, scale);
 
 	// Manually compute normals if necessary
-	if (normals.size() == 0 && verticesIndex.size() > 0)
+	if ((normals.size() == 0 || computeNormals) && verticesIndex.size() > 0)
 	{
-		normals.resize(vertices.size(), glm::vec3(0.0, 0.0, 0.0));
+		normals.resize(verticesIndex.size() / 3, glm::vec3(0.0, 0.0, 0.0));
 		for (unsigned int i = 0; i < verticesIndex.size(); i += 3)
 		{
 			GLuint ia = verticesIndex[i];
@@ -431,11 +431,6 @@ bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vecto
 	
 	return true;
 }
-
-//void indexDataMesh(Mesh *m)
-//{
-//	indexData(m->vertices, m->textures, m->normals, m->verticesIndex, m->texturesIndex, m->normalsIndex, m->texturesNumber);
-//}
 
 int main(void)
 {
@@ -610,12 +605,18 @@ struct
 
 	GLint size;
 	Mesh* mesh;
+
+	GLuint program_sun;
+	GLint sun_size;
+	GLuint buffer_sun;
+	GLuint vao_sun;
+	GLuint sun_radius;
 } gs;
 
-Mesh* createMesh(const char* filename, GLushort num_texture, const glm::vec3 pos = glm::vec3(0.f), const glm::vec3 scale = glm::vec3(1.f))
+Mesh* createMesh(const char* filename, GLushort num_texture, const glm::vec3 pos = glm::vec3(0.f), const glm::vec3 scale = glm::vec3(1.f), const bool computeNormals = false)
 {
 	Mesh *m = new Mesh();
-	if (load_obj(filename, m->vertices, m->textures, m->normals, m->verticesIndex, m->texturesIndex, m->normalsIndex, m->texturesNumber, num_texture, pos, scale))
+	if (load_obj(filename, m->vertices, m->textures, m->normals, m->verticesIndex, m->texturesIndex, m->normalsIndex, m->texturesNumber, num_texture, pos, scale, computeNormals))
 		return m;
 	return nullptr;
 }
@@ -635,20 +636,22 @@ void init()
 	// Build our program and an empty VAO
 	gs.program = buildProgram("basic.vsl", "basic.fsl");
 	gs.program_fbo = buildProgram("basic.vsl", "texture.fsl");
+	gs.program_sun = buildProgram("basic.vsl", "sun.fsl");
 
 	// Global parameters
 	gs.start = clock();
-	gs.p = glm::vec4(0.f, 1.f, 0.f, 0.f);
-	gs.camPos = glm::vec3(0.f, 3.f, -7.f); 
+	gs.p = glm::vec4(0.f, 2.f, 0.f, 0.f);
+	gs.camPos = glm::vec3(0.f, 3.f, 5.f); 
 	gs.lightPos = glm::vec3(2.f, 5.f, -3.f); // 2.f, 5.f, -3.f
 	gs.near = 0.1f;
 	gs.far = 100.f;
 	gs.fov = 90.f;
+	gs.sun_radius = 1.f;
 
 	float cube_size = 10.f;
 	float size = cube_size * 0.85f;
 
-	gs.mesh = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
+	/*gs.mesh = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
 		glm::vec3(-5.F, -0.5f, 5.F),
 		glm::vec3(5.F, -0.5f, -5.F),
 		glm::vec3(5.F, -0.5f, 5.F), 
@@ -656,9 +659,9 @@ void init()
 
 	Mesh *cube = createMesh("RubiksCube.obj", 1, glm::vec3(0.f, 0.10f + cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
-	gs.mesh->merge(cube);
+	gs.mesh->merge(cube);*/
 
-	/*gs.mesh = createMesh("Stormtrooper.obj", 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
+	gs.mesh = createMesh("Stormtrooper.obj", 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
 	if (gs.mesh != nullptr)
 	{
@@ -683,12 +686,22 @@ void init()
 		{
 			gs.mesh->merge(dragon);
 		}
-	}*/
+	}
 
 	if (gs.mesh != nullptr)
 	{
 		gs.mesh->indexData();
 		gs.size = static_cast<GLint>(gs.mesh->vertices_indexed.size());
+
+		Mesh *sun = createMesh("Sphere.obj", -1, glm::vec3(0.f), glm::vec3(gs.sun_radius));
+		sun->indexData();
+		gs.sun_size = sun->vertices_indexed.size();
+
+		// Vertex buffer sun
+		glGenBuffers(1, &gs.buffer_sun);
+		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_sun);
+		glBufferData(GL_ARRAY_BUFFER, sun->vertices_indexed.size() * sizeof(glm::vec4), &sun->vertices_indexed[0], GL_STATIC_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 		// Vertex buffer
 		glGenBuffers(1, &gs.buffer);
@@ -796,6 +809,7 @@ void init()
 
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
+		glGenerateMipmap(GL_TEXTURE_2D);
 		glBindSampler(1, gs.texturesSamplerBuffer[0]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 
@@ -809,6 +823,7 @@ void init()
 
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
+		glGenerateMipmap(GL_TEXTURE_2D);
 		glBindSampler(2, gs.texturesSamplerBuffer[1]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 
@@ -822,12 +837,13 @@ void init()
 
 		glActiveTexture(GL_TEXTURE3);
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[2]);
+		glGenerateMipmap(GL_TEXTURE_2D);
 		glBindSampler(3, gs.texturesSamplerBuffer[2]);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
 
 		gs.texturesBuffer[2] = SOIL_load_OGL_texture
 			(
-			"Alduin.png",
+			"Alduin.tga",
 			SOIL_LOAD_AUTO,
 			SOIL_CREATE_NEW_ID,
 			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
@@ -846,6 +862,24 @@ void init()
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 		glBindVertexArray(0);
+
+		// Sun
+		glCreateVertexArrays(1, &gs.vao_sun);
+		glBindVertexArray(gs.vao_sun);
+
+		// Vertex shader input vec4 pt
+		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_sun);
+		glEnableVertexArrayAttrib(gs.vao_sun, 11);
+		glVertexAttribPointer(11, 4, GL_FLOAT, GL_FALSE, 0, (void *)0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		// Vertex shader input vec3 normal
+		glBindBuffer(GL_ARRAY_BUFFER, gs.normalsBuffer);
+		glEnableVertexArrayAttrib(gs.vao_sun, 12);
+		glVertexAttribPointer(12, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		glBindVertexArray(0);
 	}
 	else
 	{
@@ -856,48 +890,19 @@ void init()
 	}
 }
 
-void updateShadowMVP(float &minX, float &maxX, float &minY, float &maxY, float &minZ, float &maxZ, const std::vector<glm::vec4> &vertices, const glm::mat4x4 &model, const glm::mat4x4  &view, const glm::mat4x4 &projection)
-{
-	minX = 999999, maxX = -999999;
-	minY = 999999, maxY = -999999;
-	minZ = 999999, maxZ = -999999;
-
-	for (int i = 0; i < vertices.size(); i++)
-	{
-		glm::vec3 ret = glm::project(glm::vec3(vertices[i].x, vertices[i].y, vertices[i].z), model, projection, glm::vec4(0, 0, WIDTH, HEIGHT));
-
-		minX = std::fminf(ret.x, minX);
-		maxX = std::fmaxf(ret.x, maxX);
-		minY = std::fminf(ret.y, minY);
-		maxY = std::fmaxf(ret.y, maxY);
-		minZ = std::fminf(ret.z, minZ);
-		maxZ = std::fmaxf(ret.z, maxZ);
-	}
-}
-
 void render(GLFWwindow* window)
 {
 	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 
 	float c = (float)(clock() - gs.start) / CLOCKS_PER_SEC;
-	//glProgramUniform1f(gs.program, 5, std::abs(cos(c)));
 
 	glm::mat4x4 projection = glm::perspective(glm::radians(gs.fov), (float)WIDTH / HEIGHT, gs.near, gs.far);
-
-	//float minX, maxX, minY, maxY, minZ, maxZ;
-	//updateShadowMVP(minX, maxX, minY, maxY, minZ, maxZ, gs.mesh->vertices, model, view, projection);
+	glm::mat4x4 model = glm::mat4x4(1.f);
 
 	// Compute the MVP matrix from the light's point of view
-	glm::mat4 depthViewMatrix = glm::lookAt(glm::vec3(gs.lightPos), glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f));
-	glm::mat4 depthMVP = projection * depthViewMatrix;
-
-	glm::mat4 biasMatrix(
-		0.5f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.5f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.5f, 0.0f,
-		0.5f, 0.5f, 0.5f, 1.0f
-		);
-	glm::mat4 depthBiasMVP = biasMatrix * depthMVP;
+	glm::mat4 depthView = glm::lookAt(glm::vec3(gs.lightPos), glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f));
+	glm::mat4 depthProj = glm::ortho(-10.f, 10.f, -10.f, 10.f, 0.1f, 100.f);
+	glm::mat4 depthMVP = depthProj * depthView;
 
 	GLuint texLoc;
 	
@@ -906,6 +911,7 @@ void render(GLFWwindow* window)
 	glUseProgram(gs.program_fbo);
 
 	glProgramUniformMatrix4fv(gs.program_fbo, 1, 1, GL_FALSE, &depthMVP[0][0]);
+	glProgramUniformMatrix4fv(gs.program_fbo, 3, 1, GL_FALSE, &model[0][0]);
 
 	glBindVertexArray(gs.vao);
 	{
@@ -926,13 +932,23 @@ void render(GLFWwindow* window)
 	glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
 	glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
 	glm::mat4x4 mvp = projection * view;
+
+	glm::mat4 biasMatrix(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.5f, 0.0f,
+		0.5f, 0.5f, 0.5f, 1.0f
+		);
+	glm::mat4 depthBiasMVP = biasMatrix * depthMVP;
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glUseProgram(gs.program);
 
 	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
 	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &depthBiasMVP[0][0]);
-	glProgramUniform3fv(gs.program, 3, 1, &gs.camPos[0]);
-	glProgramUniform3fv(gs.program, 4, 1, &gs.lightPos[0]);
+	glProgramUniformMatrix4fv(gs.program, 3, 1, GL_FALSE, &model[0][0]);
+	glProgramUniform3fv(gs.program, 4, 1, &gs.camPos[0]);
+	glProgramUniform3fv(gs.program, 5, 1, &gs.lightPos[0]);
 
 	glBindVertexArray(gs.vao);
 	{
@@ -949,14 +965,26 @@ void render(GLFWwindow* window)
 		//glDrawElements(GL_TRIANGLES, gs.mesh->verticesIndex.size(), GL_UNSIGNED_INT, NULL);	
 	}
 
+	/*gs.camPos.x = 5.f * cos(c);
+	gs.camPos.z = 5.f * sin(c);*/
 
-	//gs.camPos.x = 5.f * cos(c);
-	//gs.camPos.z = 5.f * sin(c);
-
-	gs.lightPos = glm::vec3(3.f * sin(c), 3.f, 3.f * cos(c));
+	gs.lightPos = glm::vec3(4.f * sin(c), 5.f, 4.f * cos(c));
 
 	glBindVertexArray(0);
 	glUseProgram(0);
 
+	glUseProgram(gs.program_sun);
+	model = glm::translate(model, glm::vec3(gs.lightPos.x, gs.lightPos.y, gs.lightPos.z));
 	
+	glProgramUniformMatrix4fv(gs.program_sun, 1, 1, GL_FALSE, &mvp[0][0]);
+	glProgramUniformMatrix4fv(gs.program_sun, 3, 1, GL_FALSE, &model[0][0]);
+	glProgramUniform3fv(gs.program_sun, 4, 1, &gs.camPos[0]);
+
+	glBindVertexArray(gs.vao_sun);
+	{
+		glDrawArrays(GL_TRIANGLES, 0, gs.sun_size);
+	}
+
+	glBindVertexArray(0);
+	glUseProgram(0);
 }

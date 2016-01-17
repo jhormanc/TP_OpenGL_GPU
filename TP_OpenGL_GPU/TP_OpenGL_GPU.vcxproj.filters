@@ -22,9 +22,7 @@
   <ItemGroup>
     <None Include="basic.vsl" />
     <None Include="basic.fsl" />
-    <None Include="shadow.fsl" />
-    <None Include="shadow.vsl" />
     <None Include="texture.fsl" />
-    <None Include="texture.vsl" />
+    <None Include="sun.fsl" />
   </ItemGroup>
 </Project>
