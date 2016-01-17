@@ -641,7 +641,7 @@ void init()
 	// Global parameters
 	gs.start = clock();
 	gs.p = glm::vec4(0.f, 2.f, 0.f, 0.f);
-	gs.camPos = glm::vec3(0.f, 3.f, 5.f); 
+	gs.camPos = glm::vec3(6.f, 6.f, 6.f); 
 	gs.lightPos = glm::vec3(2.f, 5.f, -3.f); // 2.f, 5.f, -3.f
 	gs.near = 0.1f;
 	gs.far = 100.f;
@@ -661,7 +661,7 @@ void init()
 
 	gs.mesh->merge(cube);*/
 
-	gs.mesh = createMesh("Stormtrooper.obj", 0, glm::vec3(2.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
+	gs.mesh = createMesh("Stormtrooper.obj", 0, glm::vec3(3.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
 
 	if (gs.mesh != nullptr)
 	{
@@ -681,7 +681,7 @@ void init()
 			gs.mesh->merge(cube);
 		}
 
-		Mesh *dragon = createMesh("Alduin.obj", 2, glm::vec3(-4.f, cube_size * 0.2f, 0.f), glm::vec3(1.f));
+		Mesh *dragon = createMesh("Alduin.obj", 2, glm::vec3(-4.f, cube_size * 0.2f, 0.f), glm::vec3(1.2f));
 		if (dragon != nullptr)
 		{
 			gs.mesh->merge(dragon);
@@ -974,8 +974,8 @@ void render(GLFWwindow* window)
 		//glDrawElements(GL_TRIANGLES, gs.mesh->verticesIndex.size(), GL_UNSIGNED_INT, NULL);	
 	}
 
-	//gs.camPos.x = 5.f * cos(c);
-	//gs.camPos.z = 5.f * sin(c);
+	/*gs.camPos.x = 5.f * cos(c);
+	gs.camPos.z = 5.f * sin(c);*/
 
 	gs.lightPos = glm::vec3(4.f * sin(c), 5.f, 4.f * cos(c));
 
