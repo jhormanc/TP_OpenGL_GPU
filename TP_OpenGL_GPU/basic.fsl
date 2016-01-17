@@ -12,7 +12,7 @@ out vec4 color_out;
 in vec4 frag_pt;
 in vec3 frag_normal;
 in vec2 frag_uv;
-flat in int frag_texture;
+flat in uint frag_texture;
 in vec4 shadow_coord;
 
 vec4 light_color = vec4(1, 1, 1, 1);

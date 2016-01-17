@@ -766,7 +766,7 @@ void init()
 		//  Vertex shader input int num_sampler
 		glBindBuffer(GL_ARRAY_BUFFER, gs.textureNumberBuffer);
 		glEnableVertexArrayAttrib(gs.vao, 14);
-		glVertexAttribIPointer(14, 1, GL_INT, 0, (void *)0);
+		glVertexAttribIPointer(14, 1, GL_UNSIGNED_INT, 0, (void *)0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 		// Depth texture
@@ -843,7 +843,7 @@ void init()
 
 		gs.texturesBuffer[2] = SOIL_load_OGL_texture
 			(
-			"Alduin.tga",
+			"Alduin.png",
 			SOIL_LOAD_AUTO,
 			SOIL_CREATE_NEW_ID,
 			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
@@ -954,10 +954,19 @@ void render(GLFWwindow* window)
 	{
 		texLoc = glGetUniformLocation(gs.program, "shadow_map");
 		glUniform1i(texLoc, 0);
+
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
 		texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
 		glUniform1i(texLoc, 1);
+
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
 		texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
 		glUniform1i(texLoc, 2);
+
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[2]);
 		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
 		glUniform1i(texLoc, 3);
 
@@ -965,8 +974,8 @@ void render(GLFWwindow* window)
 		//glDrawElements(GL_TRIANGLES, gs.mesh->verticesIndex.size(), GL_UNSIGNED_INT, NULL);	
 	}
 
-	/*gs.camPos.x = 5.f * cos(c);
-	gs.camPos.z = 5.f * sin(c);*/
+	//gs.camPos.x = 5.f * cos(c);
+	//gs.camPos.z = 5.f * sin(c);
 
 	gs.lightPos = glm::vec3(4.f * sin(c), 5.f, 4.f * cos(c));
 
