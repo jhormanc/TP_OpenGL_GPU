@@ -15,13 +15,16 @@
 
 #include <glm\glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/transform.hpp>
 
 #include <soil\SOIL.h>
 
 #define WIDTH 640
 #define HEIGHT 480
-#define SHADOW_WIDTH 8192
-#define SHADOW_HEIGHT 8192
+#define SHADOW_WIDTH 2048
+#define SHADOW_HEIGHT 2048
+#define MIRROR_TEXTURE_WIDTH 256
+#define MIRROR_TEXTURE_HEIGHT 256
 #define PI 3.14159265359
 
 using namespace std;
@@ -31,10 +34,13 @@ void init();
 
 #define glInfo(a) std::cout << #a << ": " << glGetString(a) << std::endl
 
-std::regex obj_regex1("f [0-9]+// [0-9]+// [0-9]+//(.*)");
-std::regex obj_regex2("f [0-9]+//[0-9]+ [0-9]+//[0-9]+ [0-9]+//[0-9]+(.*)");
-std::regex obj_regex3("f [0-9]+/[0-9]+/[0-9]+ [0-9]+/[0-9]+/[0-9]+ [0-9]+/[0-9]+/[0-9]+[\\r\\n]*");
-std::regex obj_regex4("f [0-9]+/[0-9]+(/?) [0-9]+/[0-9]+(/?) [0-9]+/[0-9]+(/?)(.*)");
+const std::regex obj_regex1("f [0-9]+// [0-9]+// [0-9]+//(.*)");
+const std::regex obj_regex2("f [0-9]+//[0-9]+ [0-9]+//[0-9]+ [0-9]+//[0-9]+(.*)");
+const std::regex obj_regex3("f [0-9]+/[0-9]+/[0-9]+ [0-9]+/[0-9]+/[0-9]+ [0-9]+/[0-9]+/[0-9]+[\\r\\n]*");
+const std::regex obj_regex4("f [0-9]+/[0-9]+(/?) [0-9]+/[0-9]+(/?) [0-9]+/[0-9]+(/?)(.*)");
+
+const float step_rot = 1.0f;
+const float step_pos = 0.2f;
 
 // This function is called on any openGL API error
 void APIENTRY debug(GLenum, // source
@@ -432,73 +438,6 @@ bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vecto
 	return true;
 }
 
-int main(void)
-{
-	GLFWwindow* window;
-
-	/* Initialize the library */
-	if (!glfwInit())
-	{
-		std::cerr << "Could not init glfw" << std::endl;
-		return -1;
-	}
-
-	// This is a debug context, this is slow, but debugs, which is interesting
-	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
-
-	/* Create a windowed mode window and its OpenGL context */
-	window = glfwCreateWindow(WIDTH, HEIGHT, "Gamagora Portal", NULL, NULL);
-	if (!window)
-	{
-		std::cerr << "Could not init window" << std::endl;
-		glfwTerminate();
-		return -1;
-	}
-
-	/* Make the window's context current */
-	glfwMakeContextCurrent(window);
-
-	GLenum err = glewInit();
-	if (err != GLEW_OK)
-	{
-		std::cerr << "Could not init GLEW" << std::endl;
-		std::cerr << glewGetErrorString(err) << std::endl;
-		glfwTerminate();
-		return -1;
-	}
-
-	// Now that the context is initialised, print some informations
-	glInfo(GL_VENDOR);
-	glInfo(GL_RENDERER);
-	glInfo(GL_VERSION);
-	glInfo(GL_SHADING_LANGUAGE_VERSION);
-
-	// And enable debug
-	glEnable(GL_DEBUG_OUTPUT);
-	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-
-	glDebugMessageCallback(debug, nullptr);
-
-	// This is our openGL init function which creates ressources
-	init();
-
-	/* Loop until the user closes the window */
-	while (!glfwWindowShouldClose(window))
-	{
-		/* Render here */
-		render(window);
-
-		/* Swap front and back buffers */
-		glfwSwapBuffers(window);
-
-		/* Poll for and process events */
-		glfwPollEvents();
-	}
-
-	glfwTerminate();
-	return 0;
-}
-
 // Build a shader from a string
 GLuint buildShader(GLenum const shaderType, std::string const src)
 {
@@ -611,6 +550,19 @@ struct
 	GLuint buffer_sun;
 	GLuint vao_sun;
 	GLuint sun_radius;
+
+	GLuint buffer_mirror;
+	GLint mirror_size;
+	GLuint vao_mirror;
+	GLuint renderedMirrorTexture;
+	GLuint framebuffer_mirror;
+	GLuint program_mirror;
+	glm::vec3 color_mirror;
+
+	// Moving
+	float rot;
+	int axe = 0;
+	glm::vec3 pos;
 } gs;
 
 Mesh* createMesh(const char* filename, GLushort num_texture, const glm::vec3 pos = glm::vec3(0.f), const glm::vec3 scale = glm::vec3(1.f), const bool computeNormals = false)
@@ -619,6 +571,65 @@ Mesh* createMesh(const char* filename, GLushort num_texture, const glm::vec3 pos
 	if (load_obj(filename, m->vertices, m->textures, m->normals, m->verticesIndex, m->texturesIndex, m->normalsIndex, m->texturesNumber, num_texture, pos, scale, computeNormals))
 		return m;
 	return nullptr;
+}
+
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+	if (action == GLFW_PRESS)
+	{
+		if (key == GLFW_KEY_LEFT)
+		{
+			gs.axe -= 1;
+			if (gs.axe < 0)
+				gs.axe = 2;
+		}
+		else if (key == GLFW_KEY_RIGHT)
+		{
+			gs.axe += 1;
+			if (gs.axe > 2)
+				gs.axe = 0;
+		}
+	}
+
+	if (key == GLFW_KEY_UP)
+	{
+		gs.rot += step_rot;
+		if (gs.rot > 360.f)
+			gs.rot = -360.f;
+	}
+	else if (key == GLFW_KEY_DOWN)
+	{
+		gs.rot -= step_rot;
+		if (gs.rot < -360.f)
+			gs.rot = 360.f;
+	}
+
+	if (key == GLFW_KEY_Q)
+	{
+		gs.pos.y += step_pos;
+	}
+	else if (key == GLFW_KEY_E)
+	{
+		gs.pos.y -= step_pos;
+	}
+
+	if (key == GLFW_KEY_W)
+	{
+		gs.pos.z += step_pos;
+	}
+	else if (key == GLFW_KEY_S)
+	{
+		gs.pos.z -= step_pos;
+	}
+
+	if (key == GLFW_KEY_A)
+	{
+		gs.pos.x += step_pos;
+	}
+	else if (key == GLFW_KEY_D)
+	{
+		gs.pos.x -= step_pos;
+	}
 }
 
 void init()
@@ -637,6 +648,7 @@ void init()
 	gs.program = buildProgram("basic.vsl", "basic.fsl");
 	gs.program_fbo = buildProgram("basic.vsl", "texture.fsl");
 	gs.program_sun = buildProgram("basic.vsl", "sun.fsl");
+	gs.program_mirror = buildProgram("mirror.vsl", "mirror.fsl");
 
 	// Global parameters
 	gs.start = clock();
@@ -647,6 +659,9 @@ void init()
 	gs.far = 100.f;
 	gs.fov = 90.f;
 	gs.sun_radius = 1.f;
+	gs.color_mirror = glm::vec3(1.f, 1.f, 1.f);
+	gs.rot = 0.f; // 135.f;
+	gs.pos = glm::vec3(0.f, 2.5f, -2.5f); // glm::vec3(0.f, 6.5f, -6.5f);
 
 	float cube_size = 10.f;
 	float size = cube_size * 0.85f;
@@ -697,6 +712,14 @@ void init()
 		sun->indexData();
 		gs.sun_size = sun->vertices_indexed.size();
 
+		Mesh *mirror = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
+			glm::vec3(-5.F, -0.5f, 5.F),
+			glm::vec3(5.F, -0.5f, -5.F),
+			glm::vec3(5.F, -0.5f, 5.F),
+			-1);
+		mirror->indexData();
+		gs.mirror_size = mirror->vertices_indexed.size();
+
 		// Vertex buffer sun
 		glGenBuffers(1, &gs.buffer_sun);
 		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_sun);
@@ -707,6 +730,12 @@ void init()
 		glGenBuffers(1, &gs.buffer);
 		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer);
 		glBufferData(GL_ARRAY_BUFFER, gs.mesh->vertices_indexed.size() * sizeof(glm::vec4), &gs.mesh->vertices_indexed[0], GL_STATIC_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		// Vertex buffer mirror
+		glGenBuffers(1, &gs.buffer_mirror);
+		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_mirror);
+		glBufferData(GL_ARRAY_BUFFER, mirror->vertices_indexed.size() * sizeof(glm::vec4), &mirror->vertices_indexed[0], GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 		/*glGenBuffers(1, &gs.bufferIndex);
@@ -769,17 +798,18 @@ void init()
 		glVertexAttribIPointer(14, 1, GL_UNSIGNED_INT, 0, (void *)0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-		// Depth texture
+
+		// === Depth texture ===
 		glGenTextures(1, &gs.renderedTexture);
 		// "Bind" the newly created texture : all future texture functions will modify this texture
 		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
 
 		glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, SHADOW_WIDTH, SHADOW_HEIGHT);
 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 		GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
 		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
@@ -803,7 +833,8 @@ void init()
 		glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
 		glGenerateMipmap(GL_TEXTURE_2D);
 
-		// Textures
+
+		// === Textures ===
 		glGenTextures(3, gs.texturesBuffer);
 		glGenSamplers(3, gs.texturesSamplerBuffer);
 
@@ -849,9 +880,67 @@ void init()
 			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
 			);
 
-		glBindVertexArray(0);
 
-		// FBO
+		// === Stencil buffer mirror === 
+
+		//glGenTextures(1, &gs.renderedMirrorTexture);
+		//// "Bind" the newly created texture : all future texture functions will modify this texture
+		//glBindTexture(GL_TEXTURE_2D, gs.renderedMirrorTexture);
+
+		//glGenRenderbuffers(1, &gs.framebuffer_mirror);
+		//glBindRenderbuffer(GL_RENDERBUFFER, gs.framebuffer_mirror);
+		//glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_STENCIL, MIRROR_TEXTURE_WIDTH, MIRROR_TEXTURE_HEIGHT);
+		//glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+		//// attach a texture to FBO color attachement point
+		//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gs.renderedMirrorTexture, 0);
+
+		//// attach a renderbuffer to depth attachment point
+		//glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gs.framebuffer_mirror);
+
+		//// attach a renderbuffer to stencil attachment point
+		//glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gs.framebuffer_mirror);
+
+		//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		//glActiveTexture(GL_TEXTURE4);
+		//glBindTexture(GL_TEXTURE_2D, gs.renderedMirrorTexture);
+		//glGenerateMipmap(GL_TEXTURE_2D);
+
+		//glEnable(GL_STENCIL_TEST);
+
+		//glGenTextures(1, &gs.renderedMirrorTexture);
+		//// "Bind" the newly created texture : all future texture functions will modify this texture
+		//glBindTexture(GL_TEXTURE_2D, gs.renderedMirrorTexture);
+
+		//glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH32F_STENCIL8, SHADOW_WIDTH, SHADOW_HEIGHT);
+
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+		////glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+		//glGenFramebuffers(1, &gs.framebuffer_mirror);
+		//glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer_mirror);
+
+		//// attach the texture to FBO depth attachment point
+		//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, gs.renderedMirrorTexture, 0);
+
+		//// Always check that our framebuffer is ok
+		//assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+		//// Render to our framebuffer
+		//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		//glActiveTexture(GL_TEXTURE4);
+		//glBindTexture(GL_TEXTURE_2D, gs.renderedMirrorTexture);
+		//glGenerateMipmap(GL_TEXTURE_2D);
+
+		//glBindVertexArray(0);
+
+
+		// === FBO === 
 		glCreateVertexArrays(1, &gs.fbo);
 		glBindVertexArray(gs.fbo);
 
@@ -863,7 +952,8 @@ void init()
 
 		glBindVertexArray(0);
 
-		// Sun
+
+		// === Sun === 
 		glCreateVertexArrays(1, &gs.vao_sun);
 		glBindVertexArray(gs.vao_sun);
 
@@ -877,6 +967,19 @@ void init()
 		glBindBuffer(GL_ARRAY_BUFFER, gs.normalsBuffer);
 		glEnableVertexArrayAttrib(gs.vao_sun, 12);
 		glVertexAttribPointer(12, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		glBindVertexArray(0);
+
+
+		// === Mirror === 
+		glCreateVertexArrays(1, &gs.vao_mirror);
+		glBindVertexArray(gs.vao_mirror);
+
+		// Vertex shader input vec4 pt
+		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_mirror);
+		glEnableVertexArrayAttrib(gs.vao_mirror, 11);
+		glVertexAttribPointer(11, 4, GL_FLOAT, GL_FALSE, 0, (void *)0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 		glBindVertexArray(0);
@@ -904,10 +1007,28 @@ void render(GLFWwindow* window)
 	glm::mat4 depthProj = glm::ortho(-10.f, 10.f, -10.f, 10.f, 0.1f, 100.f);
 	glm::mat4 depthMVP = depthProj * depthView;
 
+	glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
+	glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
+	glm::mat4x4 mvp = projection * view;
+
+	glm::mat4 biasMatrix(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.5f, 0.0f,
+		0.5f, 0.5f, 0.5f, 1.0f
+		);
+	glm::mat4 depthBiasMVP = biasMatrix * depthMVP;
+
 	GLuint texLoc;
+
+	/*gs.camPos.x = 5.f * cos(c);
+	gs.camPos.z = 5.f * sin(c);*/
+
+	gs.lightPos = glm::vec3(4.f * sin(c), 5.f, 4.f * cos(c));
 	
+	// Shadow map
 	glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	glUseProgram(gs.program_fbo);
 
 	glProgramUniformMatrix4fv(gs.program_fbo, 1, 1, GL_FALSE, &depthMVP[0][0]);
@@ -921,27 +1042,16 @@ void render(GLFWwindow* window)
 	glBindVertexArray(0);
 	glUseProgram(0);
 
+	// Scene
 	int width, height;
 	glfwGetFramebufferSize(window, &width, &height);
 	glViewport(0, 0, width, height);
-
+	
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
 	glGenerateMipmap(GL_TEXTURE_2D);
 
-	glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
-	glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
-	glm::mat4x4 mvp = projection * view;
-
-	glm::mat4 biasMatrix(
-		0.5f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.5f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.5f, 0.0f,
-		0.5f, 0.5f, 0.5f, 1.0f
-		);
-	glm::mat4 depthBiasMVP = biasMatrix * depthMVP;
-
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	glUseProgram(gs.program);
 
 	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
@@ -974,14 +1084,10 @@ void render(GLFWwindow* window)
 		//glDrawElements(GL_TRIANGLES, gs.mesh->verticesIndex.size(), GL_UNSIGNED_INT, NULL);	
 	}
 
-	/*gs.camPos.x = 5.f * cos(c);
-	gs.camPos.z = 5.f * sin(c);*/
-
-	gs.lightPos = glm::vec3(4.f * sin(c), 5.f, 4.f * cos(c));
-
 	glBindVertexArray(0);
 	glUseProgram(0);
 
+	// Light
 	glUseProgram(gs.program_sun);
 	model = glm::translate(model, glm::vec3(gs.lightPos.x, gs.lightPos.y, gs.lightPos.z));
 	
@@ -996,4 +1102,159 @@ void render(GLFWwindow* window)
 
 	glBindVertexArray(0);
 	glUseProgram(0);
+
+	// Mirror
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glEnable(GL_STENCIL_TEST);
+	glStencilFunc(GL_ALWAYS, 1, 0xFF); // Set any stencil to 1
+	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+	glStencilMask(0xFF); // Write to stencil buffer
+	glDepthMask(GL_FALSE); // Don't write to depth buffer
+	glClear(GL_STENCIL_BUFFER_BIT); // Clear stencil buffer (0 by default)
+
+	glUseProgram(gs.program_mirror);
+	glm::mat4 mat_scale = glm::scale(glm::vec3(1.0f, 1.0f, 0.5f));
+	glm::mat4 mat_rot;
+
+	if (gs.axe == 0)
+		mat_rot = glm::rotate(glm::radians(gs.rot), glm::vec3(1.f, 0.f, 0.f));
+	else if (gs.axe == 1)
+		mat_rot = glm::rotate(glm::radians(gs.rot), glm::vec3(0.f, 1.f, 0.f));
+	else
+		mat_rot = glm::rotate(glm::radians(gs.rot), glm::vec3(0.f, 0.f, 1.f));
+
+	glm::mat4 mat_pos = glm::translate(gs.pos);
+
+	model = mat_pos * glm::rotate(glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)) * mat_rot * mat_scale;
+
+	glProgramUniformMatrix4fv(gs.program_mirror, 6, 1, GL_FALSE, &mvp[0][0]);
+	glProgramUniformMatrix4fv(gs.program_mirror, 7, 1, GL_FALSE, &model[0][0]);
+	glProgramUniform3fv(gs.program_mirror, 8, 1, &gs.color_mirror[0]);
+
+	glBindVertexArray(gs.vao_mirror);
+	{
+		glDrawArrays(GL_TRIANGLES, 0, gs.mirror_size);
+	}
+
+	glBindVertexArray(0);
+	glUseProgram(0);
+
+
+	// Stencil scene
+	
+	glStencilFunc(GL_EQUAL, 1, 0xFF); // Pass test if stencil value is 1
+	glStencilMask(0x00); // Don't write anything to stencil buffer
+	glDepthMask(GL_TRUE); // Write to depth buffer
+	glClear(GL_DEPTH_BUFFER_BIT);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	glUseProgram(gs.program);
+
+	model = mat_pos * mat_rot * glm::scale(glm::vec3(-1.f, 1.f, -1.f)); // * glm::rotate(glm::radians(180.f), glm::vec3(0.f, 1.f, 0.f))
+
+	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
+	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &depthBiasMVP[0][0]);
+	glProgramUniformMatrix4fv(gs.program, 3, 1, GL_FALSE, &model[0][0]);
+	glProgramUniform3fv(gs.program, 4, 1, &gs.camPos[0]);
+	glProgramUniform3fv(gs.program, 5, 1, &gs.lightPos[0]);
+
+	glBindVertexArray(gs.vao);
+	{
+		texLoc = glGetUniformLocation(gs.program, "shadow_map");
+		glUniform1i(texLoc, 0);
+
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
+		glUniform1i(texLoc, 1);
+
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
+		glUniform1i(texLoc, 2);
+
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[2]);
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
+		glUniform1i(texLoc, 3);
+
+		glDrawArrays(GL_TRIANGLES, 0, gs.size);
+		//glDrawElements(GL_TRIANGLES, gs.mesh->verticesIndex.size(), GL_UNSIGNED_INT, NULL);	
+	}
+
+	glDisable(GL_STENCIL_TEST);
+	glBindVertexArray(0);
+	glUseProgram(0);
+}
+
+int main(void)
+{
+	GLFWwindow* window;
+
+	/* Initialize the library */
+	if (!glfwInit())
+	{
+		std::cerr << "Could not init glfw" << std::endl;
+		return -1;
+	}
+
+	// This is a debug context, this is slow, but debugs, which is interesting
+	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+
+	/* Create a windowed mode window and its OpenGL context */
+	window = glfwCreateWindow(WIDTH, HEIGHT, "Gamagora Portal", NULL, NULL);
+	if (!window)
+	{
+		std::cerr << "Could not init window" << std::endl;
+		glfwTerminate();
+		return -1;
+	}
+
+	/* Make the window's context current */
+	glfwMakeContextCurrent(window);
+
+	GLenum err = glewInit();
+	if (err != GLEW_OK)
+	{
+		std::cerr << "Could not init GLEW" << std::endl;
+		std::cerr << glewGetErrorString(err) << std::endl;
+		glfwTerminate();
+		return -1;
+	}
+
+	// Now that the context is initialised, print some informations
+	glInfo(GL_VENDOR);
+	glInfo(GL_RENDERER);
+	glInfo(GL_VERSION);
+	glInfo(GL_SHADING_LANGUAGE_VERSION);
+
+	// And enable debug
+	glEnable(GL_DEBUG_OUTPUT);
+	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+
+	glDebugMessageCallback(debug, nullptr);
+
+	// Keyboard events
+	glfwSetKeyCallback(window, key_callback);
+
+	// This is our openGL init function which creates ressources
+	init();
+
+	/* Loop until the user closes the window */
+	while (!glfwWindowShouldClose(window))
+	{
+		/* Render here */
+		render(window);
+
+		/* Swap front and back buffers */
+		glfwSwapBuffers(window);
+
+		/* Poll for and process events */
+		glfwPollEvents();
+	}
+
+	glfwTerminate();
+	return 0;
 }

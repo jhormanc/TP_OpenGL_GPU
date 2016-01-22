@@ -24,5 +24,7 @@
     <None Include="basic.fsl" />
     <None Include="texture.fsl" />
     <None Include="sun.fsl" />
+    <None Include="mirror.fsl" />
+    <None Include="mirror.vsl" />
   </ItemGroup>
 </Project>
