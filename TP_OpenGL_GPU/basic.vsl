@@ -23,5 +23,5 @@ void main()
 	frag_uv = uv;
 	frag_normal = normal;
 	frag_texture = num_sampler;
-	shadow_coord = camera_light * model  * p;
+	shadow_coord = camera_light * p;
 }

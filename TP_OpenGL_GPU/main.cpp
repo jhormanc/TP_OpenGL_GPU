@@ -154,13 +154,11 @@ struct Mesh
 		facesNormals[4] = 4;
 		facesNormals[5] = 3;
 
-		std::vector<glm::vec2> UVTextures(6);
+		std::vector<glm::vec2> UVTextures(4);
 		UVTextures[0] = glm::vec2(0, 1);
-		UVTextures[1] = glm::vec2(0, 0);
-		UVTextures[2] = glm::vec2(1, 1);
+		UVTextures[1] = glm::vec2(1, 1);
+		UVTextures[2] = glm::vec2(1, 0);
 		UVTextures[3] = glm::vec2(0, 0);
-		UVTextures[4] = glm::vec2(1, 0);
-		UVTextures[5] = glm::vec2(1, 1);
 
 		std::vector<GLuint> texturesIndex(6);
 		texturesIndex[0] = 1;
@@ -178,7 +176,7 @@ struct Mesh
 		number[4] = num_texture;
 		number[5] = num_texture;
 
-		return new Mesh(points, UVTextures, normals, faces, facesNormals, texturesIndex, number);
+		return new Mesh(points, UVTextures, normals, faces, texturesIndex, facesNormals, number);
 	}
 
 	void indexData()
@@ -549,7 +547,7 @@ struct
 	GLint sun_size;
 	GLuint buffer_sun;
 	GLuint vao_sun;
-	GLuint sun_radius;
+	GLfloat sun_radius;
 
 	GLuint buffer_mirror;
 	GLint mirror_size;
@@ -558,6 +556,7 @@ struct
 	GLuint framebuffer_mirror;
 	GLuint program_mirror;
 	glm::vec3 color_mirror;
+	Mesh *mirror;
 
 	// Moving
 	float rot;
@@ -661,7 +660,7 @@ void init()
 	gs.sun_radius = 1.f;
 	gs.color_mirror = glm::vec3(1.f, 1.f, 1.f);
 	gs.rot = 0.f; // 135.f;
-	gs.pos = glm::vec3(0.f, 2.5f, -2.5f); // glm::vec3(0.f, 6.5f, -6.5f);
+	gs.pos = glm::vec3(0.f, 0.f, 0.f); // glm::vec3(0.f, 6.5f, -6.5f);
 
 	float cube_size = 10.f;
 	float size = cube_size * 0.85f;
@@ -710,15 +709,23 @@ void init()
 
 		Mesh *sun = createMesh("Sphere.obj", -1, glm::vec3(0.f), glm::vec3(gs.sun_radius));
 		sun->indexData();
-		gs.sun_size = sun->vertices_indexed.size();
+		gs.sun_size = static_cast<GLint>(sun->vertices_indexed.size());
 
-		Mesh *mirror = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
+		gs.mirror = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
 			glm::vec3(-5.F, -0.5f, 5.F),
 			glm::vec3(5.F, -0.5f, -5.F),
 			glm::vec3(5.F, -0.5f, 5.F),
 			-1);
-		mirror->indexData();
-		gs.mirror_size = mirror->vertices_indexed.size();
+
+		//gs.mirror = Mesh::Quadrangle(glm::vec3(-5.F, 0.f, -5.F), 
+		//	glm::vec3(-5.F, 5.f, -5.F),
+		//	glm::vec3(-5.F, 0.f, 5.F),
+		//	glm::vec3(-5.F, 5.f, 5.F),
+		//	
+		//	-1);
+
+ 		gs.mirror->indexData();
+		gs.mirror_size = static_cast<GLint>(gs.mirror->vertices_indexed.size());
 
 		// Vertex buffer sun
 		glGenBuffers(1, &gs.buffer_sun);
@@ -735,7 +742,7 @@ void init()
 		// Vertex buffer mirror
 		glGenBuffers(1, &gs.buffer_mirror);
 		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_mirror);
-		glBufferData(GL_ARRAY_BUFFER, mirror->vertices_indexed.size() * sizeof(glm::vec4), &mirror->vertices_indexed[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, gs.mirror->vertices_indexed.size() * sizeof(glm::vec4), &gs.mirror->vertices_indexed[0], GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 		/*glGenBuffers(1, &gs.bufferIndex);
@@ -880,65 +887,7 @@ void init()
 			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
 			);
 
-
-		// === Stencil buffer mirror === 
-
-		//glGenTextures(1, &gs.renderedMirrorTexture);
-		//// "Bind" the newly created texture : all future texture functions will modify this texture
-		//glBindTexture(GL_TEXTURE_2D, gs.renderedMirrorTexture);
-
-		//glGenRenderbuffers(1, &gs.framebuffer_mirror);
-		//glBindRenderbuffer(GL_RENDERBUFFER, gs.framebuffer_mirror);
-		//glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_STENCIL, MIRROR_TEXTURE_WIDTH, MIRROR_TEXTURE_HEIGHT);
-		//glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-		//// attach a texture to FBO color attachement point
-		//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gs.renderedMirrorTexture, 0);
-
-		//// attach a renderbuffer to depth attachment point
-		//glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gs.framebuffer_mirror);
-
-		//// attach a renderbuffer to stencil attachment point
-		//glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gs.framebuffer_mirror);
-
-		//glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-		//glActiveTexture(GL_TEXTURE4);
-		//glBindTexture(GL_TEXTURE_2D, gs.renderedMirrorTexture);
-		//glGenerateMipmap(GL_TEXTURE_2D);
-
-		//glEnable(GL_STENCIL_TEST);
-
-		//glGenTextures(1, &gs.renderedMirrorTexture);
-		//// "Bind" the newly created texture : all future texture functions will modify this texture
-		//glBindTexture(GL_TEXTURE_2D, gs.renderedMirrorTexture);
-
-		//glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH32F_STENCIL8, SHADOW_WIDTH, SHADOW_HEIGHT);
-
-		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-		////glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-
-		//glGenFramebuffers(1, &gs.framebuffer_mirror);
-		//glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer_mirror);
-
-		//// attach the texture to FBO depth attachment point
-		//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, gs.renderedMirrorTexture, 0);
-
-		//// Always check that our framebuffer is ok
-		//assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-
-		//// Render to our framebuffer
-		//glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-		//glActiveTexture(GL_TEXTURE4);
-		//glBindTexture(GL_TEXTURE_2D, gs.renderedMirrorTexture);
-		//glGenerateMipmap(GL_TEXTURE_2D);
-
-		//glBindVertexArray(0);
-
+		glBindVertexArray(0);
 
 		// === FBO === 
 		glCreateVertexArrays(1, &gs.fbo);
@@ -1004,7 +953,7 @@ void render(GLFWwindow* window)
 
 	// Compute the MVP matrix from the light's point of view
 	glm::mat4 depthView = glm::lookAt(glm::vec3(gs.lightPos), glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f));
-	glm::mat4 depthProj = glm::ortho(-10.f, 10.f, -10.f, 10.f, 0.1f, 100.f);
+	glm::mat4 depthProj = glm::ortho(-10.f, 10.f, -10.f, 10.f, gs.near, gs.far);
 	glm::mat4 depthMVP = depthProj * depthView;
 
 	glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
@@ -1125,7 +1074,7 @@ void render(GLFWwindow* window)
 
 	glm::mat4 mat_pos = glm::translate(gs.pos);
 
-	model = mat_pos * glm::rotate(glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)) * mat_rot * mat_scale;
+	model = mat_pos * glm::rotate(glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)) * mat_rot * mat_scale;// mat_pos * glm::rotate(glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)) * mat_rot * mat_scale;
 
 	glProgramUniformMatrix4fv(gs.program_mirror, 6, 1, GL_FALSE, &mvp[0][0]);
 	glProgramUniformMatrix4fv(gs.program_mirror, 7, 1, GL_FALSE, &model[0][0]);
@@ -1141,18 +1090,24 @@ void render(GLFWwindow* window)
 
 
 	// Stencil scene
-	
+
 	glStencilFunc(GL_EQUAL, 1, 0xFF); // Pass test if stencil value is 1
 	glStencilMask(0x00); // Don't write anything to stencil buffer
 	glDepthMask(GL_TRUE); // Write to depth buffer
-	glClear(GL_DEPTH_BUFFER_BIT);
+	
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
 	glGenerateMipmap(GL_TEXTURE_2D);
-
+	glClear(GL_DEPTH_BUFFER_BIT);
 	glUseProgram(gs.program);
-
-	model = mat_pos * mat_rot * glm::scale(glm::vec3(-1.f, 1.f, -1.f)); // * glm::rotate(glm::radians(180.f), glm::vec3(0.f, 1.f, 0.f))
+	glCullFace(GL_FRONT);
+	
+	glm::vec3 pos = gs.pos;
+	pos.y = -pos.y * 0.1f;
+	pos.x = -pos.x * 0.1f;
+	//pos.z = -pos.z;
+	// model = mat_pos * mat_rot * mat_scale * glm::scale(glm::vec3(1.f, 1.f, -1.f));
+	model = glm::translate(pos) * mat_rot * glm::scale(glm::vec3(1.f, 1.f, -1.f)); // * glm::rotate(glm::radians(180.f), glm::vec3(0.f, 1.f, 0.f))
 
 	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
 	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &depthBiasMVP[0][0]);
@@ -1183,10 +1138,27 @@ void render(GLFWwindow* window)
 		glDrawArrays(GL_TRIANGLES, 0, gs.size);
 		//glDrawElements(GL_TRIANGLES, gs.mesh->verticesIndex.size(), GL_UNSIGNED_INT, NULL);	
 	}
+	glBindVertexArray(0);
+	glUseProgram(0);
 
+	// Stencil Light
+	glUseProgram(gs.program_sun);
+	model = glm::translate(model, glm::vec3(gs.lightPos.x, gs.lightPos.y, gs.lightPos.z));
+
+	glProgramUniformMatrix4fv(gs.program_sun, 1, 1, GL_FALSE, &mvp[0][0]);
+	glProgramUniformMatrix4fv(gs.program_sun, 3, 1, GL_FALSE, &model[0][0]);
+	glProgramUniform3fv(gs.program_sun, 4, 1, &gs.camPos[0]);
+
+	glBindVertexArray(gs.vao_sun);
+	{
+		glDrawArrays(GL_TRIANGLES, 0, gs.sun_size);
+	}
+	glCullFace(GL_BACK);
 	glDisable(GL_STENCIL_TEST);
 	glBindVertexArray(0);
 	glUseProgram(0);
+
+	glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 }
 
 int main(void)
@@ -1203,6 +1175,9 @@ int main(void)
 	// This is a debug context, this is slow, but debugs, which is interesting
 	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 
+	// MSAA
+	glfwWindowHint(GLFW_SAMPLES, 8);
+
 	/* Create a windowed mode window and its OpenGL context */
 	window = glfwCreateWindow(WIDTH, HEIGHT, "Gamagora Portal", NULL, NULL);
 	if (!window)
@@ -1211,6 +1186,8 @@ int main(void)
 		glfwTerminate();
 		return -1;
 	}
+
+	glEnable(GL_MULTISAMPLE);
 
 	/* Make the window's context current */
 	glfwMakeContextCurrent(window);
