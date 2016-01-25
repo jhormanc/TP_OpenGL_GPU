@@ -5,7 +5,7 @@ layout(location = 3) uniform mat4x4 model;
 layout(location = 4) uniform vec3 cam_pos;
 layout(location = 5) uniform vec3 light_pos;
 
-uniform sampler2D texture_sampler[3];
+uniform sampler2D texture_sampler[4];
 uniform sampler2D shadow_map;
 
 out vec4 color_out;
@@ -21,6 +21,25 @@ vec4 diffus = vec4(1, 1, 1, 1);
 vec4 specular = vec4(1, 1, 1, 1);
 float light_power = 15;
 float ambient_power = 0.1;
+
+vec2 poissonDisk[16] = vec2[]( 
+   vec2(-0.94201624, -0.39906216), 
+   vec2(0.94558609, -0.76890725), 
+   vec2(-0.094184101, -0.92938870), 
+   vec2(0.34495938, 0.29387760), 
+   vec2(-0.91588581, 0.45771432), 
+   vec2(-0.81544232, -0.87912464), 
+   vec2(-0.38277543, 0.27676845), 
+   vec2(0.97484398, 0.75648379), 
+   vec2(0.44323325, -0.97511554), 
+   vec2(0.53742981, -0.47373420), 
+   vec2(-0.26496911, -0.41893023), 
+   vec2(0.79197514, 0.19090188), 
+   vec2(-0.24188840, 0.99706507), 
+   vec2(-0.81409955, 0.91437590), 
+   vec2(0.19984126, 0.78641367), 
+   vec2(0.14383161, -0.14100790) 
+);
 
 void main()
 {
@@ -74,9 +93,14 @@ void main()
 		
 	float shadow = 1.0;
 
-	if (shadow_coord.w > 0.0)
-	//&& frag_pos.y < 0.3 && frag_pos.x < 7.0 && frag_pos.y < 7.0 && frag_pos.x > -7.0 && frag_pos.y > -7.0) // Hack shadow wall
-	 	shadow = distFromLight < coord.z ? 0.5 : 1.0;
+	// Poisson Sampling
+	for (int i = 0; i < 16; i++)
+	{
+		if (texture(shadow_map, coord.xy + poissonDisk[i] / 700.0).z < coord.z)
+		{
+			shadow -= 0.05; // max visibility 0.2
+		}
+	}
 
 	vec4 c_out = ambient // Ambient : simulates indirect lighting
 	+ shadow * diffus * light_color * light_power * cos_theta / (dist * dist) // Diffuse : "color" of the object

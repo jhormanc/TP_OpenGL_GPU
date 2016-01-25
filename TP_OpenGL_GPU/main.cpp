@@ -334,8 +334,8 @@ struct
 	GLuint normalsBuffer, normalsBufferIndex;
 	GLuint colorBuffer, colorBufferIndex;
 	GLuint textureNumberBuffer;
-	GLuint texturesBuffer[3];
-	GLuint texturesSamplerBuffer[3];
+	GLuint texturesBuffer[4];
+	GLuint texturesSamplerBuffer[4];
 
 	GLuint fbo;
 	GLuint program_fbo;
@@ -447,7 +447,7 @@ void init()
 	// Global parameters
 	gs.start = clock();
 	gs.p = glm::vec4(0.f, 2.f, 0.f, 0.f);
-	gs.lightPos = glm::vec3(2.f, 5.f, -3.f); // 2.f, 5.f, -3.f
+	gs.lightPos = glm::vec3(2.f, 9.f, -3.f); // 2.f, 5.f, -3.f
 	gs.near = 0.1f;
 	gs.far = 100.f;
 	gs.sun_radius = 1.f;
@@ -477,7 +477,7 @@ void init()
 
 	gs.mesh->merge(cube);*/
 
-	gs.mesh = createMesh("Stormtrooper.obj", 0, glm::vec3(3.f, cube_size * 0.11f, 0.f), glm::vec3(1.f), 180.f, glm::vec3(0.f, 1.f, 0.f));
+	gs.mesh = createMesh("Stormtrooper.obj", 0, glm::vec3(-1.f, cube_size * 0.127f, -1.5f), glm::vec3(1.2f), 180.f, glm::vec3(0.f, 1.f, 0.f));
 
 	if (gs.mesh != nullptr)
 	{
@@ -498,11 +498,18 @@ void init()
 		}
 
 		Mesh *dragon = createMesh("Alduin.obj", 2, glm::vec3(0.f), glm::vec3(1.f), -10.f, glm::vec3(0.f, 0.f, 1.f));
-		dragon->SetMeshModel(glm::vec3(-2.f, cube_size * 0.4f, 3.f), glm::vec3(1.2f), 45.f, glm::vec3(0.f, 1.f, 0.f));
+		dragon->SetMeshModel(glm::vec3(0.f, cube_size * 0.4f, 4.f), glm::vec3(1.5f), 45.f, glm::vec3(0.f, 1.f, 0.f));
 
 		if (dragon != nullptr)
 		{
 			gs.mesh->merge(dragon);
+		}
+
+		Mesh *c3po = createMesh("c3po.obj", 3, glm::vec3(3.5f, cube_size * 0.132f, 0.f), glm::vec3(1.2f), 220.f, glm::vec3(0.f, 1.f, 0.f));
+
+		if (c3po != nullptr)
+		{
+			gs.mesh->merge(c3po);
 		}
 	}
 
@@ -639,8 +646,8 @@ void init()
 
 
 		// === Textures ===
-		glGenTextures(3, gs.texturesBuffer);
-		glGenSamplers(3, gs.texturesSamplerBuffer);
+		glGenTextures(4, gs.texturesBuffer);
+		glGenSamplers(4, gs.texturesSamplerBuffer);
 
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
@@ -683,6 +690,20 @@ void init()
 			SOIL_CREATE_NEW_ID,
 			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
 			);
+
+		glActiveTexture(GL_TEXTURE4);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[3]);
+		glGenerateMipmap(GL_TEXTURE_2D);
+		glBindSampler(4, gs.texturesSamplerBuffer[3]);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL); // Decal tarnish
+
+		gs.texturesBuffer[3] = SOIL_load_OGL_texture
+			(
+				"c3po.tga",
+				SOIL_LOAD_AUTO,
+				SOIL_CREATE_NEW_ID,
+				SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
+				);
 
 		glBindVertexArray(0);
 
@@ -771,6 +792,11 @@ void draw_scene(const glm::mat4x4 &mat_cam, const glm::mat4x4 &mat_depth_cam, co
 		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
 		glUniform1i(texLoc, 3);
 
+		glActiveTexture(GL_TEXTURE4);
+		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[3]);
+		texLoc = glGetUniformLocation(gs.program, "texture_sampler[3]");
+		glUniform1i(texLoc, 4);
+
 		glDrawArrays(GL_TRIANGLES, 0, gs.size);
 		//glDrawElements(GL_TRIANGLES, gs.mesh->verticesIndex.size(), GL_UNSIGNED_INT, NULL);	
 	}
@@ -845,7 +871,7 @@ void render(GLFWwindow* window)
 
 	glm::mat4 depthBiasMVP = gs.biasMatrix * depthMVP;
 
-	gs.lightPos = glm::vec3(4.f * sin(c), 5.f, 4.f * cos(c));
+	gs.lightPos = glm::vec3(3.f * sin(c), 6.f, 3.f * cos(c));
 
 	
 	// Shadow map
@@ -889,18 +915,20 @@ void render(GLFWwindow* window)
 
 	glm::mat4 mat_pos = glm::translate(gs.pos);
 
-	model = mat_pos * glm::rotate(glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)) * mat_rot * mat_scale;// mat_pos * glm::rotate(glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)) * mat_rot * mat_scale;
+	model = mat_pos * mat_rot * glm::rotate(glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)) * mat_scale;
 
 	draw_mirror(mvp, model);
 
 	// Stencil scene
 
 	glm::vec3 pos = gs.pos;
-	pos.y = -pos.y * 0.1f;
-	pos.x = -pos.x * 0.1f;
+	pos.y = pos.y * 0.2f;
+	pos.x = -pos.x * 0.f;
+	pos.z = pos.z * 2.1f;
+	
 	//pos.z = -pos.z;
 	// model = mat_pos * mat_rot * mat_scale * glm::scale(glm::vec3(1.f, 1.f, -1.f));
-	model = glm::translate(pos) * mat_rot * glm::scale(glm::vec3(1.f, 1.f, -1.f)); // * glm::rotate(glm::radians(180.f), glm::vec3(0.f, 1.f, 0.f))
+	model = glm::translate(pos) * mat_rot * glm::scale(glm::vec3(1.0f, 0.8f, 1.0f)) * glm::scale(glm::vec3(1.f, 1.f, -1.f)); // * glm::rotate(glm::radians(180.f), glm::vec3(0.f, 1.f, 0.f))
 
 	glStencilFunc(GL_EQUAL, 1, 0xFF); // Pass test if stencil value is 1
 	glStencilMask(0x00); // Don't write anything to stencil buffer
