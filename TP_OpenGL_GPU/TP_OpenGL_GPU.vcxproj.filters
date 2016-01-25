@@ -27,4 +27,12 @@
     <None Include="mirror.fsl" />
     <None Include="mirror.vsl" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Mesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>

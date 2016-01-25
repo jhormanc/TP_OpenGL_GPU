@@ -26,17 +26,17 @@ void main()
 {
 	// Calculate normal in world coordinates
     mat3 normalMatrix = transpose(inverse(mat3(model)));
-    vec3 n = normalize(mat3(camera) * normalMatrix * frag_normal);
+    vec3 n = normalize(normalMatrix * frag_normal);
 
     // Calculate the location of this fragment (pixel) in world coordinates
-    vec3 frag_pos = (camera * model * frag_pt).xyz;
+    vec3 frag_pos = (model * frag_pt).xyz;
 
 	// Direction of the light (from the fragment to the light)
-	vec3 light = (camera * model * vec4(light_pos, 1)).xyz;
+	vec3 light = (model * vec4(light_pos, 1)).xyz;
 	vec3 l = normalize(light - frag_pos);
 
 	// Eye vector (towards the camera)
-	vec3 cam = (camera * model * vec4(cam_pos, 1)).xyz;
+	vec3 cam = (model * vec4(cam_pos, 1)).xyz;
 	vec3 e = normalize(cam - frag_pos);
 
 	// Direction in which the triangle reflects the light

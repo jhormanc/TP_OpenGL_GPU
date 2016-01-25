@@ -14,8 +14,8 @@
 #include <GL\GL.h>
 
 #include <glm\glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/transform.hpp>
+#include <glm\gtc\matrix_transform.hpp>
+#include <glm\gtx\transform.hpp>
 
 #include <soil\SOIL.h>
 
@@ -26,6 +26,9 @@
 #define MIRROR_TEXTURE_WIDTH 256
 #define MIRROR_TEXTURE_HEIGHT 256
 #define PI 3.14159265359
+
+#include "Mesh.h"
+#include "Camera.h"
 
 using namespace std;
 
@@ -54,207 +57,6 @@ void APIENTRY debug(GLenum, // source
 	std::cout << "DEBUG: " << message << std::endl;
 }
 
-struct Mesh
-{
-	std::vector<glm::vec4> vertices;
-	std::vector<glm::vec2> textures;
-	std::vector<glm::vec3> normals;
-	std::vector<glm::vec4> vertices_indexed;
-	std::vector<glm::vec2> textures_indexed;
-	std::vector<glm::vec3> normals_indexed;
-	std::vector<GLuint> verticesIndex;
-	std::vector<GLuint> texturesIndex;
-	std::vector<GLuint> normalsIndex;
-	std::vector<GLuint> texturesNumber;
-	std::vector<GLuint> texturesNumber_indexed;
-
-	Mesh() :
-		vertices(std::vector<glm::vec4>()),
-		textures(std::vector<glm::vec2>()),
-		normals(std::vector<glm::vec3>()),
-		verticesIndex(std::vector<GLuint>()),
-		texturesIndex(std::vector<GLuint>()),
-		normalsIndex(std::vector<GLuint>()),
-		texturesNumber(std::vector<GLuint>())
-	{
-
-	}
-
-	Mesh(std::vector<glm::vec4> _vertices, std::vector<glm::vec2> _textures, std::vector<glm::vec3> _normals, 
-		std::vector<GLuint> _verticesIndex, std::vector<GLuint> _texturesIndex, std::vector<GLuint> _normalsIndex, std::vector<GLuint> _texturesNumber) :
-		vertices(_vertices),
-		textures(_textures),
-		normals(_normals),
-		verticesIndex(_verticesIndex),
-		texturesIndex(_texturesIndex),
-		normalsIndex(_normalsIndex),
-		texturesNumber(_texturesNumber)
-	{
-
-	}
-
-	void merge(Mesh* m)
-	{
-		int vertices_size = static_cast<int>(vertices.size());
-		int textures_size = static_cast<int>(textures.size());
-		int normals_size = static_cast<int>(normals.size());
-
-		for (int i = 0; i < m->vertices.size(); i++)
-			vertices.push_back(m->vertices[i]);
-
-		for (int i = 0; i < m->textures.size(); i++)
-			textures.push_back(m->textures[i]);
-
-		for (int i = 0; i < m->normals.size(); i++)
-			normals.push_back(m->normals[i]);
-
-		for (int i = 0; i < m->verticesIndex.size(); i++)
-			verticesIndex.push_back(vertices_size + m->verticesIndex[i]);
-
-		for (int i = 0; i < m->texturesIndex.size(); i++)
-			texturesIndex.push_back(textures_size + m->texturesIndex[i]);
-
-		for (int i = 0; i < m->normalsIndex.size(); i++)
-			normalsIndex.push_back(normals_size + m->normalsIndex[i]);
-
-		for (int i = 0; i < m->texturesNumber.size(); i++)
-			texturesNumber.push_back(m->texturesNumber[i]);
-	}
-
-	static Mesh* Quadrangle(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, const int num_texture)
-	{
-		std::vector<glm::vec4> points(4);
-		points[0] = glm::vec4(p0.x, p0.y, p0.z, 1.f);
-		points[1] = glm::vec4(p1.x, p1.y, p1.z, 1.f);
-		points[2] = glm::vec4(p2.x, p2.y, p2.z, 1.f);
-		points[3] = glm::vec4(p3.x, p3.y, p3.z, 1.f);
-
-		std::vector<GLuint> faces(6);
-		faces[0] = 1;
-		faces[1] = 2;
-		faces[2] = 3;
-		faces[3] = 2;
-		faces[4] = 4;
-		faces[5] = 3;
-
-		glm::vec3 normalT1 = glm::normalize(glm::cross(p1 - p0, p3 - p0));
-		glm::vec3 normalT2 = glm::normalize(glm::cross(p1 - p2, p3 - p2));
-		glm::vec3 normalMiddle = glm::normalize((normalT1 + normalT2) * 0.5f);
-		std::vector<glm::vec3> normals(4);
-		normals[0] = normalT1;
-		normals[1] = normalMiddle;
-		normals[2] = normalMiddle;
-		normals[3] = normalT2;
-
-		std::vector<GLuint> facesNormals(6);
-		facesNormals[0] = 1;
-		facesNormals[1] = 2;
-		facesNormals[2] = 3;
-		facesNormals[3] = 2;
-		facesNormals[4] = 4;
-		facesNormals[5] = 3;
-
-		std::vector<glm::vec2> UVTextures(4);
-		UVTextures[0] = glm::vec2(0, 1);
-		UVTextures[1] = glm::vec2(1, 1);
-		UVTextures[2] = glm::vec2(1, 0);
-		UVTextures[3] = glm::vec2(0, 0);
-
-		std::vector<GLuint> texturesIndex(6);
-		texturesIndex[0] = 1;
-		texturesIndex[1] = 2;
-		texturesIndex[2] = 3;
-		texturesIndex[3] = 2;
-		texturesIndex[4] = 4;
-		texturesIndex[5] = 3;
-
-		std::vector<GLuint> number(6);
-		number[0] = num_texture;
-		number[1] = num_texture;
-		number[2] = num_texture;
-		number[3] = num_texture;
-		number[4] = num_texture;
-		number[5] = num_texture;
-
-		return new Mesh(points, UVTextures, normals, faces, texturesIndex, facesNormals, number);
-	}
-
-	void indexData()
-	{
-		vertices_indexed = std::vector<glm::vec4>();
-		textures_indexed = std::vector<glm::vec2>();
-		normals_indexed = std::vector<glm::vec3>();
-		texturesNumber_indexed = std::vector<GLuint>();
-
-		if (vertices.size() > 0)
-		{
-			if (verticesIndex.size() > 0)
-			{
-				for (unsigned int i = 0; i < verticesIndex.size(); i++)
-				{
-					unsigned int vertexIndex = verticesIndex[i];
-					glm::vec4 vertex = vertices[vertexIndex - 1];
-					vertices_indexed.push_back(vertex);
-					GLuint num = texturesNumber[vertexIndex - 1];
-					texturesNumber_indexed.push_back(num);
-				}
-			}
-			else
-			{
-				for (unsigned int i = 0; i < vertices.size(); i++)
-				{
-					glm::vec4 vertex = vertices[i];
-					vertices_indexed.push_back(vertex);
-					GLint num = texturesNumber[i];
-					texturesNumber_indexed.push_back(num);
-				}
-			}
-		}
-
-		if (textures.size() > 0)
-		{
-			if (texturesIndex.size() > 0)
-			{
-				for (unsigned int i = 0; i < texturesIndex.size(); i++)
-				{
-					unsigned int uvIndex = texturesIndex[i];
-					glm::vec2 uv = textures[uvIndex - 1];
-					textures_indexed.push_back(uv);
-				}
-			}
-			else
-			{
-				for (unsigned int i = 0; i < textures.size(); i++)
-				{
-					glm::vec2 uv = textures[i];
-					textures_indexed.push_back(uv);
-				}
-			}
-		}
-
-		if (normals.size() > 0)
-		{
-			if (normalsIndex.size() > 0)
-			{
-				for (unsigned int i = 0; i < normalsIndex.size(); i++)
-				{
-					unsigned int normalIndex = normalsIndex[i];
-					glm::vec3 normal = normals[normalIndex - 1];
-					normals_indexed.push_back(normal);
-				}
-			}
-			else
-			{
-				for (unsigned int i = 0; i < normals.size(); i++)
-				{
-					glm::vec3 normal = normals[i];
-					normals_indexed.push_back(normal);
-				}
-			}
-		}
-	}
-};
-
 void translate(std::vector<glm::vec4> &points, const glm::vec3 &t)
 {
 	for (unsigned int i = 0; i < points.size(); i++)
@@ -270,7 +72,7 @@ glm::vec4 maxVec4(const glm::vec4 &v1, const glm::vec4 &v2, const glm::vec4 &cen
 	return v2;
 }
 
-void normalizePointList(std::vector<glm::vec4> &points, const glm::vec3 &pos, const glm::vec3 &scale)
+void normalizePointList(std::vector<glm::vec4> &points, const glm::vec3 &pos, const glm::vec3 &scale, const float rot_angle = 0.f, const glm::vec3 &rot_axes = glm::vec3(0.f))
 {
 	glm::vec3 shift(0.f);
 	for (unsigned int i = 0; i < points.size(); i++)
@@ -316,7 +118,7 @@ void normalizePointList(std::vector<glm::vec4> &points, const glm::vec3 &pos, co
 
 bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vector<glm::vec2> &textures, std::vector<glm::vec3> &normals, std::vector<GLuint> &verticesIndex,
 	std::vector<GLuint> &texturesIndex, std::vector<GLuint> &normalsIndex, std::vector<GLuint> &texturesNumber, GLuint num_texture,
-	const glm::vec3 pos = glm::vec3(0.f), const glm::vec3 scale = glm::vec3(1.f), const bool computeNormals = false)
+	const glm::vec3 &pos = glm::vec3(0.f), const glm::vec3 &scale = glm::vec3(1.f), const float rot_angle = 0.f, const glm::vec3 &rot_axes = glm::vec3(0.f), const bool computeNormals = false)
 {
 	FILE *file;
 	fopen_s(&file, filename, "r");
@@ -413,7 +215,7 @@ bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vecto
 	}
 
 	// Set position and scale
-	normalizePointList(vertices, pos, scale);
+	normalizePointList(vertices, pos, scale, rot_angle, rot_axes);
 
 	// Manually compute normals if necessary
 	if ((normals.size() == 0 || computeNormals) && verticesIndex.size() > 0)
@@ -525,9 +327,8 @@ struct
 
 	clock_t start;
 	glm::vec4 p;
-	glm::vec3 camPos;
 	glm::vec3 lightPos;
-	GLfloat near, far, fov;
+	GLfloat near, far;
 	GLuint buffer, bufferIndex;
 	GLuint normalsBuffer, normalsBufferIndex;
 	GLuint colorBuffer, colorBufferIndex;
@@ -562,57 +363,50 @@ struct
 	float rot;
 	int axe = 0;
 	glm::vec3 pos;
+
+	glm::mat4 projection;
+	glm::mat4 depthProj;
+	glm::mat4 biasMatrix;
 } gs;
 
-Mesh* createMesh(const char* filename, GLushort num_texture, const glm::vec3 pos = glm::vec3(0.f), const glm::vec3 scale = glm::vec3(1.f), const bool computeNormals = false)
+Mesh* createMesh(const char* filename, const GLushort num_texture, const glm::vec3 &pos = glm::vec3(0.f), const glm::vec3 &scale = glm::vec3(1.f), const float rot_angle = 0.f, const glm::vec3 &rot_axes = glm::vec3(0.f), bool computeNormals = false)
 {
 	Mesh *m = new Mesh();
-	if (load_obj(filename, m->vertices, m->textures, m->normals, m->verticesIndex, m->texturesIndex, m->normalsIndex, m->texturesNumber, num_texture, pos, scale, computeNormals))
+	if (load_obj(filename, m->vertices, m->textures, m->normals, m->verticesIndex, m->texturesIndex, m->normalsIndex, m->texturesNumber, num_texture, pos, scale, rot_angle, rot_axes, computeNormals))
 		return m;
 	return nullptr;
 }
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-	if (action == GLFW_PRESS)
+	if (key == GLFW_KEY_LEFT)
 	{
-		if (key == GLFW_KEY_LEFT)
-		{
-			gs.axe -= 1;
-			if (gs.axe < 0)
-				gs.axe = 2;
-		}
-		else if (key == GLFW_KEY_RIGHT)
-		{
-			gs.axe += 1;
-			if (gs.axe > 2)
-				gs.axe = 0;
-		}
+		gs.pos.z += step_pos;
+	}
+	else if (key == GLFW_KEY_RIGHT)
+	{
+		gs.pos.z -= step_pos;
 	}
 
 	if (key == GLFW_KEY_UP)
 	{
-		gs.rot += step_rot;
-		if (gs.rot > 360.f)
-			gs.rot = -360.f;
+		gs.pos.x += step_pos;
 	}
 	else if (key == GLFW_KEY_DOWN)
 	{
-		gs.rot -= step_rot;
-		if (gs.rot < -360.f)
-			gs.rot = 360.f;
+		gs.pos.x -= step_pos;
 	}
 
-	if (key == GLFW_KEY_Q)
-	{
-		gs.pos.y += step_pos;
-	}
-	else if (key == GLFW_KEY_E)
-	{
-		gs.pos.y -= step_pos;
-	}
+	//if (key == GLFW_KEY_Q)
+	//{
+	//	gs.pos.y += step_pos;
+	//}
+	//else if (key == GLFW_KEY_E)
+	//{
+	//	gs.pos.y -= step_pos;
+	//}
 
-	if (key == GLFW_KEY_W)
+	/*if (key == GLFW_KEY_W)
 	{
 		gs.pos.z += step_pos;
 	}
@@ -628,7 +422,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 	else if (key == GLFW_KEY_D)
 	{
 		gs.pos.x -= step_pos;
-	}
+	}*/
 }
 
 void init()
@@ -652,15 +446,22 @@ void init()
 	// Global parameters
 	gs.start = clock();
 	gs.p = glm::vec4(0.f, 2.f, 0.f, 0.f);
-	gs.camPos = glm::vec3(6.f, 6.f, 6.f); 
 	gs.lightPos = glm::vec3(2.f, 5.f, -3.f); // 2.f, 5.f, -3.f
 	gs.near = 0.1f;
 	gs.far = 100.f;
-	gs.fov = 90.f;
 	gs.sun_radius = 1.f;
 	gs.color_mirror = glm::vec3(1.f, 1.f, 1.f);
 	gs.rot = 0.f; // 135.f;
-	gs.pos = glm::vec3(0.f, 0.f, 0.f); // glm::vec3(0.f, 6.5f, -6.5f);
+	gs.pos = glm::vec3(0.f, 2.5f, -5.0f); // glm::vec3(0.f, 6.5f, -6.5f);
+
+	gs.projection = glm::perspective(glm::radians(cam.fov), (float)WIDTH / HEIGHT, gs.near, gs.far);
+	gs.depthProj = glm::ortho(-10.f, 10.f, -10.f, 10.f, gs.near, gs.far);
+	gs.biasMatrix = glm::mat4(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.5f, 0.0f,
+		0.5f, 0.5f, 0.5f, 1.0f
+		);
 
 	float cube_size = 10.f;
 	float size = cube_size * 0.85f;
@@ -716,13 +517,6 @@ void init()
 			glm::vec3(5.F, -0.5f, -5.F),
 			glm::vec3(5.F, -0.5f, 5.F),
 			-1);
-
-		//gs.mirror = Mesh::Quadrangle(glm::vec3(-5.F, 0.f, -5.F), 
-		//	glm::vec3(-5.F, 5.f, -5.F),
-		//	glm::vec3(-5.F, 0.f, 5.F),
-		//	glm::vec3(-5.F, 5.f, 5.F),
-		//	
-		//	-1);
 
  		gs.mirror->indexData();
 		gs.mirror_size = static_cast<GLint>(gs.mirror->vertices_indexed.size());
@@ -942,71 +736,16 @@ void init()
 	}
 }
 
-void render(GLFWwindow* window)
+void draw_scene(const glm::mat4x4 &mat_cam, const glm::mat4x4 &mat_depth_cam, const glm::mat4x4 &model)
 {
-	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
-
-	float c = (float)(clock() - gs.start) / CLOCKS_PER_SEC;
-
-	glm::mat4x4 projection = glm::perspective(glm::radians(gs.fov), (float)WIDTH / HEIGHT, gs.near, gs.far);
-	glm::mat4x4 model = glm::mat4x4(1.f);
-
-	// Compute the MVP matrix from the light's point of view
-	glm::mat4 depthView = glm::lookAt(glm::vec3(gs.lightPos), glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f));
-	glm::mat4 depthProj = glm::ortho(-10.f, 10.f, -10.f, 10.f, gs.near, gs.far);
-	glm::mat4 depthMVP = depthProj * depthView;
-
-	glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
-	glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
-	glm::mat4x4 mvp = projection * view;
-
-	glm::mat4 biasMatrix(
-		0.5f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.5f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.5f, 0.0f,
-		0.5f, 0.5f, 0.5f, 1.0f
-		);
-	glm::mat4 depthBiasMVP = biasMatrix * depthMVP;
-
 	GLuint texLoc;
 
-	/*gs.camPos.x = 5.f * cos(c);
-	gs.camPos.z = 5.f * sin(c);*/
-
-	gs.lightPos = glm::vec3(4.f * sin(c), 5.f, 4.f * cos(c));
-	
-	// Shadow map
-	glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-	glUseProgram(gs.program_fbo);
-
-	glProgramUniformMatrix4fv(gs.program_fbo, 1, 1, GL_FALSE, &depthMVP[0][0]);
-	glProgramUniformMatrix4fv(gs.program_fbo, 3, 1, GL_FALSE, &model[0][0]);
-
-	glBindVertexArray(gs.vao);
-	{
-		glDrawArrays(GL_TRIANGLES, 0, gs.size);
-	}
-
-	glBindVertexArray(0);
-	glUseProgram(0);
-
-	// Scene
-	int width, height;
-	glfwGetFramebufferSize(window, &width, &height);
-	glViewport(0, 0, width, height);
-	
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
-	glGenerateMipmap(GL_TEXTURE_2D);
-
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	glUseProgram(gs.program);
 
-	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
-	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &depthBiasMVP[0][0]);
+	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mat_cam[0][0]);
+	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &mat_depth_cam[0][0]);
 	glProgramUniformMatrix4fv(gs.program, 3, 1, GL_FALSE, &model[0][0]);
-	glProgramUniform3fv(gs.program, 4, 1, &gs.camPos[0]);
+	glProgramUniform3fv(gs.program, 4, 1, &cam.position[0]);
 	glProgramUniform3fv(gs.program, 5, 1, &gs.lightPos[0]);
 
 	glBindVertexArray(gs.vao);
@@ -1035,22 +774,96 @@ void render(GLFWwindow* window)
 
 	glBindVertexArray(0);
 	glUseProgram(0);
+}
 
-	// Light
+void draw_light(const glm::mat4x4 &mat_cam, const glm::mat4x4 &model)
+{
 	glUseProgram(gs.program_sun);
-	model = glm::translate(model, glm::vec3(gs.lightPos.x, gs.lightPos.y, gs.lightPos.z));
-	
-	glProgramUniformMatrix4fv(gs.program_sun, 1, 1, GL_FALSE, &mvp[0][0]);
+
+	glProgramUniformMatrix4fv(gs.program_sun, 1, 1, GL_FALSE, &mat_cam[0][0]);
 	glProgramUniformMatrix4fv(gs.program_sun, 3, 1, GL_FALSE, &model[0][0]);
-	glProgramUniform3fv(gs.program_sun, 4, 1, &gs.camPos[0]);
+	glProgramUniform3fv(gs.program_sun, 4, 1, &cam.position[0]);
 
 	glBindVertexArray(gs.vao_sun);
 	{
 		glDrawArrays(GL_TRIANGLES, 0, gs.sun_size);
 	}
+}
+
+void draw_shadow(const glm::mat4x4 &mat_depth_cam, const glm::mat4x4 &model)
+{
+	glUseProgram(gs.program_fbo);
+
+	glProgramUniformMatrix4fv(gs.program_fbo, 1, 1, GL_FALSE, &mat_depth_cam[0][0]);
+	glProgramUniformMatrix4fv(gs.program_fbo, 3, 1, GL_FALSE, &model[0][0]);
+
+	glBindVertexArray(gs.vao);
+	{
+		glDrawArrays(GL_TRIANGLES, 0, gs.size);
+	}
 
 	glBindVertexArray(0);
 	glUseProgram(0);
+
+}
+
+void draw_mirror(const glm::mat4x4 &mat_cam, const glm::mat4x4 &model)
+{
+	glUseProgram(gs.program_mirror);
+	glProgramUniformMatrix4fv(gs.program_mirror, 6, 1, GL_FALSE, &mat_cam[0][0]);
+	glProgramUniformMatrix4fv(gs.program_mirror, 7, 1, GL_FALSE, &model[0][0]);
+	glProgramUniform3fv(gs.program_mirror, 8, 1, &gs.color_mirror[0]);
+
+	glBindVertexArray(gs.vao_mirror);
+	{
+		glDrawArrays(GL_TRIANGLES, 0, gs.mirror_size);
+	}
+
+	glBindVertexArray(0);
+	glUseProgram(0);
+}
+
+void render(GLFWwindow* window)
+{
+	float c = (float)(clock() - gs.start) / CLOCKS_PER_SEC;
+	cam.update(window);
+	
+	glm::mat4x4 model = glm::mat4x4(1.f);
+
+	// Camera MVP (model is omitted because it's uniform)
+	glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
+	//glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
+	glm::mat4x4 view = glm::lookAt(cam.position, cam.position + cam.direction, cam.up);
+	glm::mat4x4 mvp = gs.projection * view;
+
+	// Compute the MVP matrix from the light's point of view
+	glm::mat4 depthView = glm::lookAt(glm::vec3(gs.lightPos), glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f));
+	glm::mat4 depthMVP = gs.depthProj * depthView;
+
+	glm::mat4 depthBiasMVP = gs.biasMatrix * depthMVP;
+
+	gs.lightPos = glm::vec3(4.f * sin(c), 5.f, 4.f * cos(c));
+
+	
+	// Shadow map
+	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+	glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+	draw_shadow(depthMVP, model);
+
+	// Scene
+	int width, height;
+	glfwGetFramebufferSize(window, &width, &height);
+	glViewport(0, 0, width, height);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+	draw_scene(mvp, depthBiasMVP, model);
+
+	// Light
+	model = glm::translate(model, glm::vec3(gs.lightPos.x, gs.lightPos.y, gs.lightPos.z));
+	draw_light(mvp, model);
 
 	// Mirror
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1061,7 +874,6 @@ void render(GLFWwindow* window)
 	glDepthMask(GL_FALSE); // Don't write to depth buffer
 	glClear(GL_STENCIL_BUFFER_BIT); // Clear stencil buffer (0 by default)
 
-	glUseProgram(gs.program_mirror);
 	glm::mat4 mat_scale = glm::scale(glm::vec3(1.0f, 1.0f, 0.5f));
 	glm::mat4 mat_rot;
 
@@ -1076,20 +888,16 @@ void render(GLFWwindow* window)
 
 	model = mat_pos * glm::rotate(glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)) * mat_rot * mat_scale;// mat_pos * glm::rotate(glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)) * mat_rot * mat_scale;
 
-	glProgramUniformMatrix4fv(gs.program_mirror, 6, 1, GL_FALSE, &mvp[0][0]);
-	glProgramUniformMatrix4fv(gs.program_mirror, 7, 1, GL_FALSE, &model[0][0]);
-	glProgramUniform3fv(gs.program_mirror, 8, 1, &gs.color_mirror[0]);
-
-	glBindVertexArray(gs.vao_mirror);
-	{
-		glDrawArrays(GL_TRIANGLES, 0, gs.mirror_size);
-	}
-
-	glBindVertexArray(0);
-	glUseProgram(0);
-
+	draw_mirror(mvp, model);
 
 	// Stencil scene
+
+	glm::vec3 pos = gs.pos;
+	pos.y = -pos.y * 0.1f;
+	pos.x = -pos.x * 0.1f;
+	//pos.z = -pos.z;
+	// model = mat_pos * mat_rot * mat_scale * glm::scale(glm::vec3(1.f, 1.f, -1.f));
+	model = glm::translate(pos) * mat_rot * glm::scale(glm::vec3(1.f, 1.f, -1.f)); // * glm::rotate(glm::radians(180.f), glm::vec3(0.f, 1.f, 0.f))
 
 	glStencilFunc(GL_EQUAL, 1, 0xFF); // Pass test if stencil value is 1
 	glStencilMask(0x00); // Don't write anything to stencil buffer
@@ -1099,64 +907,16 @@ void render(GLFWwindow* window)
 	glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glClear(GL_DEPTH_BUFFER_BIT);
-	glUseProgram(gs.program);
 	glCullFace(GL_FRONT);
-	
-	glm::vec3 pos = gs.pos;
-	pos.y = -pos.y * 0.1f;
-	pos.x = -pos.x * 0.1f;
-	//pos.z = -pos.z;
-	// model = mat_pos * mat_rot * mat_scale * glm::scale(glm::vec3(1.f, 1.f, -1.f));
-	model = glm::translate(pos) * mat_rot * glm::scale(glm::vec3(1.f, 1.f, -1.f)); // * glm::rotate(glm::radians(180.f), glm::vec3(0.f, 1.f, 0.f))
 
-	glProgramUniformMatrix4fv(gs.program, 1, 1, GL_FALSE, &mvp[0][0]);
-	glProgramUniformMatrix4fv(gs.program, 2, 1, GL_FALSE, &depthBiasMVP[0][0]);
-	glProgramUniformMatrix4fv(gs.program, 3, 1, GL_FALSE, &model[0][0]);
-	glProgramUniform3fv(gs.program, 4, 1, &gs.camPos[0]);
-	glProgramUniform3fv(gs.program, 5, 1, &gs.lightPos[0]);
-
-	glBindVertexArray(gs.vao);
-	{
-		texLoc = glGetUniformLocation(gs.program, "shadow_map");
-		glUniform1i(texLoc, 0);
-
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[0]);
-		texLoc = glGetUniformLocation(gs.program, "texture_sampler[0]");
-		glUniform1i(texLoc, 1);
-
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[1]);
-		texLoc = glGetUniformLocation(gs.program, "texture_sampler[1]");
-		glUniform1i(texLoc, 2);
-
-		glActiveTexture(GL_TEXTURE3);
-		glBindTexture(GL_TEXTURE_2D, gs.texturesBuffer[2]);
-		texLoc = glGetUniformLocation(gs.program, "texture_sampler[2]");
-		glUniform1i(texLoc, 3);
-
-		glDrawArrays(GL_TRIANGLES, 0, gs.size);
-		//glDrawElements(GL_TRIANGLES, gs.mesh->verticesIndex.size(), GL_UNSIGNED_INT, NULL);	
-	}
-	glBindVertexArray(0);
-	glUseProgram(0);
+	draw_scene(mvp, depthBiasMVP, model);
 
 	// Stencil Light
-	glUseProgram(gs.program_sun);
 	model = glm::translate(model, glm::vec3(gs.lightPos.x, gs.lightPos.y, gs.lightPos.z));
+	draw_light(mvp, model);
 
-	glProgramUniformMatrix4fv(gs.program_sun, 1, 1, GL_FALSE, &mvp[0][0]);
-	glProgramUniformMatrix4fv(gs.program_sun, 3, 1, GL_FALSE, &model[0][0]);
-	glProgramUniform3fv(gs.program_sun, 4, 1, &gs.camPos[0]);
-
-	glBindVertexArray(gs.vao_sun);
-	{
-		glDrawArrays(GL_TRIANGLES, 0, gs.sun_size);
-	}
 	glCullFace(GL_BACK);
 	glDisable(GL_STENCIL_TEST);
-	glBindVertexArray(0);
-	glUseProgram(0);
 
 	glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 }
