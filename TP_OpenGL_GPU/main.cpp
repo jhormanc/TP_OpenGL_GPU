@@ -72,7 +72,7 @@ glm::vec4 maxVec4(const glm::vec4 &v1, const glm::vec4 &v2, const glm::vec4 &cen
 	return v2;
 }
 
-void normalizePointList(std::vector<glm::vec4> &points, const glm::vec3 &pos, const glm::vec3 &scale, const float rot_angle = 0.f, const glm::vec3 &rot_axes = glm::vec3(0.f))
+void normalizePointList(std::vector<glm::vec4> &points, const glm::vec3 &pos, const glm::vec3 &scale, const float rot_angle, const glm::vec3 &rot_axes)
 {
 	glm::vec3 shift(0.f);
 	for (unsigned int i = 0; i < points.size(); i++)
@@ -110,15 +110,16 @@ void normalizePointList(std::vector<glm::vec4> &points, const glm::vec3 &pos, co
 
 	for (unsigned int i = 0; i < points.size(); i++)
 	{
-		points[i].x = pos.x + (((points[i].x - minX) - diffX * 0.5f) / (length * 0.5f)) * scale.x;
-		points[i].y = pos.y + (((points[i].y - minY) - diffY * 0.5f) / (length * 0.5f)) * scale.y;
-		points[i].z = pos.z + (((points[i].z - minZ) - diffZ * 0.5f) / (length * 0.5f)) * scale.z;
+		points[i].x = ((points[i].x - minX) - diffX * 0.5f) / (length * 0.5f);
+		points[i].y = ((points[i].y - minY) - diffY * 0.5f) / (length * 0.5f);
+		points[i].z = ((points[i].z - minZ) - diffZ * 0.5f) / (length * 0.5f);
+		points[i] = glm::translate(pos) * glm::rotate(glm::radians(rot_angle), rot_axes) * glm::scale(scale) * points[i];
 	}
 }
 
 bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vector<glm::vec2> &textures, std::vector<glm::vec3> &normals, std::vector<GLuint> &verticesIndex,
 	std::vector<GLuint> &texturesIndex, std::vector<GLuint> &normalsIndex, std::vector<GLuint> &texturesNumber, GLuint num_texture,
-	const glm::vec3 &pos = glm::vec3(0.f), const glm::vec3 &scale = glm::vec3(1.f), const float rot_angle = 0.f, const glm::vec3 &rot_axes = glm::vec3(0.f), const bool computeNormals = false)
+	const glm::vec3 &pos = glm::vec3(0.f), const glm::vec3 &scale = glm::vec3(1.f), const float rot_angle = 0.f, const glm::vec3 &rot_axes = glm::vec3(1.f), const bool computeNormals = false)
 {
 	FILE *file;
 	fopen_s(&file, filename, "r");
@@ -369,7 +370,7 @@ struct
 	glm::mat4 biasMatrix;
 } gs;
 
-Mesh* createMesh(const char* filename, const GLushort num_texture, const glm::vec3 &pos = glm::vec3(0.f), const glm::vec3 &scale = glm::vec3(1.f), const float rot_angle = 0.f, const glm::vec3 &rot_axes = glm::vec3(0.f), bool computeNormals = false)
+Mesh* createMesh(const char* filename, const GLushort num_texture, const glm::vec3 &pos = glm::vec3(0.f), const glm::vec3 &scale = glm::vec3(1.f), const float rot_angle = 0.f, const glm::vec3 &rot_axes = glm::vec3(1.f), bool computeNormals = false)
 {
 	Mesh *m = new Mesh();
 	if (load_obj(filename, m->vertices, m->textures, m->normals, m->verticesIndex, m->texturesIndex, m->normalsIndex, m->texturesNumber, num_texture, pos, scale, rot_angle, rot_axes, computeNormals))
@@ -476,7 +477,7 @@ void init()
 
 	gs.mesh->merge(cube);*/
 
-	gs.mesh = createMesh("Stormtrooper.obj", 0, glm::vec3(3.f, cube_size * 0.11f, 0.f), glm::vec3(1.f));
+	gs.mesh = createMesh("Stormtrooper.obj", 0, glm::vec3(3.f, cube_size * 0.11f, 0.f), glm::vec3(1.f), 180.f, glm::vec3(0.f, 1.f, 0.f));
 
 	if (gs.mesh != nullptr)
 	{
@@ -496,7 +497,9 @@ void init()
 			gs.mesh->merge(cube);
 		}
 
-		Mesh *dragon = createMesh("Alduin.obj", 2, glm::vec3(-4.f, cube_size * 0.2f, 0.f), glm::vec3(1.2f));
+		Mesh *dragon = createMesh("Alduin.obj", 2, glm::vec3(0.f), glm::vec3(1.f), -10.f, glm::vec3(0.f, 0.f, 1.f));
+		dragon->SetMeshModel(glm::vec3(-2.f, cube_size * 0.4f, 3.f), glm::vec3(1.2f), 45.f, glm::vec3(0.f, 1.f, 0.f));
+
 		if (dragon != nullptr)
 		{
 			gs.mesh->merge(dragon);
@@ -975,6 +978,9 @@ int main(void)
 
 	// Keyboard events
 	glfwSetKeyCallback(window, key_callback);
+
+	// Hide cursor
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
 	// This is our openGL init function which creates ressources
 	init();

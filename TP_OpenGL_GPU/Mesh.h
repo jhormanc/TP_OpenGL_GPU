@@ -200,8 +200,11 @@ struct Mesh
 		}
 	}
 
-	void SetMeshModel(const glm::vec3 &pos = glm::vec3(0.f), const glm::vec3 &scale = glm::vec3(1.f), const float rot_angle = 0.f, const glm::vec3 &rot_axes = glm::vec3(0.f))
+	void SetMeshModel(const glm::vec3 &pos = glm::vec3(0.f), const glm::vec3 &scale = glm::vec3(1.f), const float rot_angle = 0.f, const glm::vec3 &rot_axes = glm::vec3(1.f))
 	{
-
+		for (unsigned int i = 0; i < vertices.size(); i++)
+		{
+			vertices[i] = glm::translate(pos) * glm::rotate(glm::radians(rot_angle), rot_axes) * glm::scale(scale) * vertices[i];
+		}
 	}
 };
