@@ -19,8 +19,8 @@ in vec4 shadow_coord;
 vec4 light_color = vec4(1, 1, 1, 1);
 vec4 diffus = vec4(1, 1, 1, 1);
 vec4 specular = vec4(1, 1, 1, 1);
-float light_power = 15;
-float ambient_power = 0.1;
+float light_power = 10;
+float ambient_power = 0.2;
 
 vec2 poissonDisk[16] = vec2[]( 
    vec2(-0.94201624, -0.39906216), 

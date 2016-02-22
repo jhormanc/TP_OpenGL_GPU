@@ -351,14 +351,15 @@ struct
 	GLuint vao_sun;
 	GLfloat sun_radius;
 
-	GLuint buffer_mirror;
+	GLuint buffer_portal[2];
 	GLint mirror_size;
-	GLuint vao_mirror;
+	GLuint vao_portal[2];
 	GLuint renderedMirrorTexture;
 	GLuint framebuffer_mirror;
 	GLuint program_mirror;
 	glm::vec3 color_mirror;
-	Mesh *mirror;
+	Mesh *portal1;
+	Mesh *portal2;
 
 	// Moving
 	float rot;
@@ -522,14 +523,22 @@ void init()
 		sun->indexData();
 		gs.sun_size = static_cast<GLint>(sun->vertices_indexed.size());
 
-		gs.mirror = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
+		gs.portal1 = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
 			glm::vec3(-5.F, -0.5f, 5.F),
 			glm::vec3(5.F, -0.5f, -5.F),
 			glm::vec3(5.F, -0.5f, 5.F),
 			-1);
 
- 		gs.mirror->indexData();
-		gs.mirror_size = static_cast<GLint>(gs.mirror->vertices_indexed.size());
+ 		gs.portal1->indexData();
+		gs.mirror_size = static_cast<GLint>(gs.portal1->vertices_indexed.size());
+
+		gs.portal2 = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
+			glm::vec3(-5.F, -0.5f, 5.F),
+			glm::vec3(5.F, -0.5f, -5.F),
+			glm::vec3(5.F, -0.5f, 5.F),
+			-1);
+
+		gs.portal2->indexData();
 
 		// Vertex buffer sun
 		glGenBuffers(1, &gs.buffer_sun);
@@ -543,10 +552,16 @@ void init()
 		glBufferData(GL_ARRAY_BUFFER, gs.mesh->vertices_indexed.size() * sizeof(glm::vec4), &gs.mesh->vertices_indexed[0], GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-		// Vertex buffer mirror
-		glGenBuffers(1, &gs.buffer_mirror);
-		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_mirror);
-		glBufferData(GL_ARRAY_BUFFER, gs.mirror->vertices_indexed.size() * sizeof(glm::vec4), &gs.mirror->vertices_indexed[0], GL_STATIC_DRAW);
+		// Vertex buffer portal 1
+		glGenBuffers(1, &gs.buffer_portal[0]);
+		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_portal[0]);
+		glBufferData(GL_ARRAY_BUFFER, gs.portal1->vertices_indexed.size() * sizeof(glm::vec4), &gs.portal1->vertices_indexed[0], GL_STATIC_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		// Vertex buffer portal 2
+		glGenBuffers(1, &gs.buffer_portal[1]);
+		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_portal[1]);
+		glBufferData(GL_ARRAY_BUFFER, gs.portal2->vertices_indexed.size() * sizeof(glm::vec4), &gs.portal2->vertices_indexed[0], GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 		/*glGenBuffers(1, &gs.bufferIndex);
@@ -740,12 +755,25 @@ void init()
 
 
 		// === Mirror === 
-		glCreateVertexArrays(1, &gs.vao_mirror);
-		glBindVertexArray(gs.vao_mirror);
+		// Portal 1
+		glCreateVertexArrays(1, &gs.vao_portal[0]);
+		glBindVertexArray(gs.vao_portal[0]);
 
 		// Vertex shader input vec4 pt
-		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_mirror);
-		glEnableVertexArrayAttrib(gs.vao_mirror, 11);
+		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_portal[0]);
+		glEnableVertexArrayAttrib(gs.vao_portal[0], 11);
+		glVertexAttribPointer(11, 4, GL_FLOAT, GL_FALSE, 0, (void *)0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		glBindVertexArray(0);
+
+		// Portal 2
+		glCreateVertexArrays(1, &gs.vao_portal[1]);
+		glBindVertexArray(gs.vao_portal[1]);
+
+		// Vertex shader input vec4 pt
+		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_portal[1]);
+		glEnableVertexArrayAttrib(gs.vao_portal[1], 11);
 		glVertexAttribPointer(11, 4, GL_FLOAT, GL_FALSE, 0, (void *)0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -833,7 +861,6 @@ void draw_shadow(const glm::mat4x4 &mat_depth_cam, const glm::mat4x4 &model)
 
 	glBindVertexArray(0);
 	glUseProgram(0);
-
 }
 
 void draw_mirror(const glm::mat4x4 &mat_cam, const glm::mat4x4 &model)
@@ -843,7 +870,7 @@ void draw_mirror(const glm::mat4x4 &mat_cam, const glm::mat4x4 &model)
 	glProgramUniformMatrix4fv(gs.program_mirror, 7, 1, GL_FALSE, &model[0][0]);
 	glProgramUniform3fv(gs.program_mirror, 8, 1, &gs.color_mirror[0]);
 
-	glBindVertexArray(gs.vao_mirror);
+	glBindVertexArray(gs.vao_portal[0]);
 	{
 		glDrawArrays(GL_TRIANGLES, 0, gs.mirror_size);
 	}
@@ -852,15 +879,38 @@ void draw_mirror(const glm::mat4x4 &mat_cam, const glm::mat4x4 &model)
 	glUseProgram(0);
 }
 
+/**
+* Compute a world2camera view matrix to see from portal 'dst', given
+* the original view and the 'src' portal position.
+*/
+glm::mat4 portal_view(glm::mat4 orig_view, glm::mat4 src_model, glm::mat4 dst_model) 
+{
+	glm::mat4 mv = orig_view * src_model;
+	glm::mat4 portal_cam = 
+		// 3. transformation from source portal to the camera - it's the
+		//    first portal's ModelView matrix:
+		mv
+		// 2. object is front-facing, the camera is facing the other way:
+		* glm::rotate(glm::mat4(1.0), 180.0f, glm::vec3(0.0, 1.0, 0.0))
+		// 1. go the destination portal; using inverse, because camera
+		//    transformations are reversed compared to object
+		//    transformations:
+		* glm::inverse(dst_model)
+		;
+	return portal_cam;
+}
+
 void render(GLFWwindow* window)
 {
 	float c = (float)(clock() - gs.start) / CLOCKS_PER_SEC;
+	gs.lightPos = glm::vec3(3.f * sin(c), 6.f, 3.f * cos(c)); // glm::vec3(4.f, 6.f, 4.f);  //
+	
 	cam.update(window);
 	
 	glm::mat4x4 model = glm::mat4x4(1.f);
 
 	// Camera MVP (model is omitted because it's uniform)
-	glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
+	//glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
 	//glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
 	glm::mat4x4 view = glm::lookAt(cam.position, cam.position + cam.direction, cam.up);
 	glm::mat4x4 mvp = gs.projection * view;
@@ -871,8 +921,6 @@ void render(GLFWwindow* window)
 
 	glm::mat4 depthBiasMVP = gs.biasMatrix * depthMVP;
 
-	gs.lightPos = glm::vec3(3.f * sin(c), 6.f, 3.f * cos(c));
-
 	
 	// Shadow map
 	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
@@ -882,7 +930,7 @@ void render(GLFWwindow* window)
 
 	// Scene
 	int width, height;
-	glfwGetFramebufferSize(window, &width, &height);
+	glfwGetWindowSize(window, &width, &height);
 	glViewport(0, 0, width, height);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
@@ -919,11 +967,15 @@ void render(GLFWwindow* window)
 
 	draw_mirror(mvp, model);
 
+	model = glm::translate(-gs.pos) * mat_rot * mat_scale;
+
+	draw_mirror(mvp, model);
+
 	// Stencil scene
 
 	glm::vec3 pos = gs.pos;
 	pos.y = pos.y * 0.2f;
-	pos.x = -pos.x * 0.f;
+	pos.x = pos.x * 0.f;
 	pos.z = pos.z * 2.1f;
 	
 	//pos.z = -pos.z;
