@@ -148,7 +148,6 @@ bool load_obj(const char* filename, std::vector<glm::vec4> &vertices, std::vecto
 			glm::vec2 uv;
 			sscanf_s(line, "vt %f %f\n", &uv.x, &uv.y);
 			textures.push_back(uv);
-			/*texturesNumber.push_back(num_texture);*/
 		}
 		else if (strncmp(line, "vn", 2) == 0)
 		{
@@ -360,11 +359,14 @@ struct
 	glm::vec3 color_mirror;
 	Mesh *portal1;
 	Mesh *portal2;
+	glm::mat4 portal1_model;
+	glm::mat4 portal2_model;
 
 	// Moving
 	float rot;
 	int axe = 0;
-	glm::vec3 pos;
+	glm::vec3 portal_pos;
+	glm::vec3 portal2_pos;
 
 	glm::mat4 projection;
 	glm::mat4 depthProj;
@@ -383,48 +385,25 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 {
 	if (key == GLFW_KEY_LEFT)
 	{
-		gs.pos.z += step_pos;
+		gs.portal_pos.z += step_pos;
 	}
 	else if (key == GLFW_KEY_RIGHT)
 	{
-		gs.pos.z -= step_pos;
+		gs.portal_pos.z -= step_pos;
 	}
 
 	if (key == GLFW_KEY_UP)
 	{
-		gs.pos.x += step_pos;
+		gs.portal_pos.x += step_pos;
 	}
 	else if (key == GLFW_KEY_DOWN)
 	{
-		gs.pos.x -= step_pos;
+		gs.portal_pos.x -= step_pos;
 	}
 
-	//if (key == GLFW_KEY_Q)
-	//{
-	//	gs.pos.y += step_pos;
-	//}
-	//else if (key == GLFW_KEY_E)
-	//{
-	//	gs.pos.y -= step_pos;
-	//}
-
-	/*if (key == GLFW_KEY_W)
-	{
-		gs.pos.z += step_pos;
-	}
-	else if (key == GLFW_KEY_S)
-	{
-		gs.pos.z -= step_pos;
-	}
-
-	if (key == GLFW_KEY_A)
-	{
-		gs.pos.x += step_pos;
-	}
-	else if (key == GLFW_KEY_D)
-	{
-		gs.pos.x -= step_pos;
-	}*/
+	glm::vec3 pos = gs.portal_pos;
+	pos.z = -pos.z;
+	gs.portal2_pos = pos;
 }
 
 void init()
@@ -448,15 +427,17 @@ void init()
 	// Global parameters
 	gs.start = clock();
 	gs.p = glm::vec4(0.f, 2.f, 0.f, 0.f);
-	gs.lightPos = glm::vec3(2.f, 9.f, -3.f); // 2.f, 5.f, -3.f
+	gs.lightPos = glm::vec3(2.f, 9.f, -3.f);
 	gs.near = 0.1f;
 	gs.far = 100.f;
 	gs.sun_radius = 1.f;
 	gs.color_mirror = glm::vec3(1.f, 1.f, 1.f);
-	gs.rot = 0.f; // 135.f;
-	gs.pos = glm::vec3(0.f, 2.5f, -5.0f); // glm::vec3(0.f, 6.5f, -6.5f);
+	gs.rot = 0.f;
+	gs.portal_pos = glm::vec3(0.f, 2.5f, -7.6f);
+	glm::vec3 pos = gs.portal_pos;
+	pos.z = -pos.z;
+	gs.portal2_pos = pos;
 
-	gs.projection = glm::perspective(glm::radians(cam.fov), (float)WIDTH / HEIGHT, gs.near, gs.far);
 	gs.depthProj = glm::ortho(-10.f, 10.f, -10.f, 10.f, gs.near, gs.far);
 	gs.biasMatrix = glm::mat4(
 		0.5f, 0.0f, 0.0f, 0.0f,
@@ -467,16 +448,6 @@ void init()
 
 	float cube_size = 10.f;
 	float size = cube_size * 0.85f;
-
-	/*gs.mesh = Mesh::Quadrangle(glm::vec3(-5.F, -0.5f, -5.F),
-		glm::vec3(-5.F, -0.5f, 5.F),
-		glm::vec3(5.F, -0.5f, -5.F),
-		glm::vec3(5.F, -0.5f, 5.F), 
-		-1);
-
-	Mesh *cube = createMesh("RubiksCube.obj", 1, glm::vec3(0.f, 0.10f + cube_size * 0.11f, 0.f), glm::vec3(1.f));
-
-	gs.mesh->merge(cube);*/
 
 	gs.mesh = createMesh("Stormtrooper.obj", 0, glm::vec3(-1.f, cube_size * 0.127f, -1.5f), glm::vec3(1.2f), 180.f, glm::vec3(0.f, 1.f, 0.f));
 
@@ -563,33 +534,18 @@ void init()
 		glBindBuffer(GL_ARRAY_BUFFER, gs.buffer_portal[1]);
 		glBufferData(GL_ARRAY_BUFFER, gs.portal2->vertices_indexed.size() * sizeof(glm::vec4), &gs.portal2->vertices_indexed[0], GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-		/*glGenBuffers(1, &gs.bufferIndex);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gs.bufferIndex);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, gs.mesh->verticesIndex.size() * sizeof(GLuint), &gs.mesh->verticesIndex[0], GL_STATIC_DRAW);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);*/
 		
 		// Normals buffer
 		glGenBuffers(1, &gs.normalsBuffer);
 		glBindBuffer(GL_ARRAY_BUFFER, gs.normalsBuffer);
 		glBufferData(GL_ARRAY_BUFFER, gs.mesh->normals_indexed.size() * sizeof(glm::vec3), &gs.mesh->normals_indexed[0], GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-		/*glGenBuffers(1, &gs.normalsBufferIndex);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gs.normalsBufferIndex);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, gs.mesh->normalsIndex.size() * sizeof(GLint), &gs.mesh->normalsIndex[0], GL_STATIC_DRAW);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);*/
 		
 		// Textures buffer
 		glGenBuffers(1, &gs.colorBuffer);
 		glBindBuffer(GL_ARRAY_BUFFER, gs.colorBuffer);
 		glBufferData(GL_ARRAY_BUFFER, gs.mesh->textures_indexed.size() * sizeof(glm::vec2), &gs.mesh->textures_indexed[0], GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-		/*glGenBuffers(1, &gs.colorBufferIndex);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gs.colorBufferIndex);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, gs.mesh->texturesIndex.size() * sizeof(GLint), &gs.mesh->verticesIndex[0], GL_STATIC_DRAW);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);*/
 
 		// Texture number buffer
 		glGenBuffers(1, &gs.textureNumberBuffer);
@@ -863,14 +819,14 @@ void draw_shadow(const glm::mat4x4 &mat_depth_cam, const glm::mat4x4 &model)
 	glUseProgram(0);
 }
 
-void draw_mirror(const glm::mat4x4 &mat_cam, const glm::mat4x4 &model)
+void draw_mirror(const int num, const glm::mat4x4 &mat_cam, const glm::mat4x4 &model)
 {
 	glUseProgram(gs.program_mirror);
 	glProgramUniformMatrix4fv(gs.program_mirror, 6, 1, GL_FALSE, &mat_cam[0][0]);
 	glProgramUniformMatrix4fv(gs.program_mirror, 7, 1, GL_FALSE, &model[0][0]);
 	glProgramUniform3fv(gs.program_mirror, 8, 1, &gs.color_mirror[0]);
 
-	glBindVertexArray(gs.vao_portal[0]);
+	glBindVertexArray(gs.vao_portal[num]);
 	{
 		glDrawArrays(GL_TRIANGLES, 0, gs.mirror_size);
 	}
@@ -879,41 +835,66 @@ void draw_mirror(const glm::mat4x4 &mat_cam, const glm::mat4x4 &model)
 	glUseProgram(0);
 }
 
-/**
-* Compute a world2camera view matrix to see from portal 'dst', given
-* the original view and the 'src' portal position.
-*/
-glm::mat4 portal_view(glm::mat4 orig_view, glm::mat4 src_model, glm::mat4 dst_model) 
+
+// Checks whether the line defined by two points la and lb intersects the portal.
+int portal_intersection(glm::vec4 &la, glm::vec4 &lb, glm::mat4 &portal_model, std::vector<glm::vec4> &vertices)
 {
-	glm::mat4 mv = orig_view * src_model;
-	glm::mat4 portal_cam = 
-		// 3. transformation from source portal to the camera - it's the
-		//    first portal's ModelView matrix:
-		mv
-		// 2. object is front-facing, the camera is facing the other way:
-		* glm::rotate(glm::mat4(1.0), 180.0f, glm::vec3(0.0, 1.0, 0.0))
-		// 1. go the destination portal; using inverse, because camera
-		//    transformations are reversed compared to object
-		//    transformations:
-		* glm::inverse(dst_model)
-		;
-	return portal_cam;
+	// Camera moved
+	if (la != lb) 
+	{  
+		// Check for intersection with each of the portal's 2 front triangles
+		for (int i = 0; i < 2; i++) 
+		{
+			// Portal coordinates in world view
+			glm::vec4
+				p0 = portal_model * vertices[i * 3 + 0],
+				p1 = portal_model * vertices[i * 3 + 1],
+				p2 = portal_model * vertices[i * 3 + 2];
+
+			// Solve line-plane intersection using parametric form
+			glm::vec3 tuv =
+				glm::inverse(glm::mat3(glm::vec3(la.x - lb.x, la.y - lb.y, la.z - lb.z),
+					glm::vec3(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z),
+					glm::vec3(p2.x - p0.x, p2.y - p0.y, p2.z - p0.z)))
+				* glm::vec3(la.x - p0.x, la.y - p0.y, la.z - p0.z);
+			float t = tuv.x, u = tuv.y, v = tuv.z;
+
+			// Intersection with the plane
+			if (t >= 0 - 1e-6 && t <= 1 + 1e-6) 
+			{
+				// Intersection with the triangle
+				if (u >= 0 - 1e-6 && u <= 1 + 1e-6 && v >= 0 - 1e-6 && v <= 1 + 1e-6 && (u + v) <= 1 + 1e-6) 
+				{
+					return 1;
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+glm::mat4x4 getMirrorModel(const glm::mat4x4 & model)
+{
+	glm::mat4x4 modelTranslate = glm::translate(glm::mat4x4(1), glm::vec3(0.f, 0.f, -15.6f));
+	glm::mat4x4 modelScale = glm::scale(glm::mat4x4(1), glm::vec3(1.f, 1.f, -1.f));
+	glm::mat4x4 modelRotate = glm::rotate(glm::mat4x4(1), glm::radians(180.f), glm::vec3(0.f, 1.f, 0.f));
+	return modelTranslate * modelRotate * modelScale * model;
 }
 
 void render(GLFWwindow* window)
 {
 	float c = (float)(clock() - gs.start) / CLOCKS_PER_SEC;
-	gs.lightPos = glm::vec3(3.f * sin(c), 6.f, 3.f * cos(c)); // glm::vec3(4.f, 6.f, 4.f);  //
-	
+	gs.lightPos = glm::vec3(4.f * sin(c * 0.5f), 6.f, 4.f * cos(c * 0.5f));
+	glm::mat4 prev_cam = cam.view;
+
 	cam.update(window);
 	
 	glm::mat4x4 model = glm::mat4x4(1.f);
-
-	// Camera MVP (model is omitted because it's uniform)
-	//glm::vec3 pt(gs.p.x, gs.p.y, gs.p.z);
-	//glm::mat4x4 view = glm::lookAt(gs.camPos, pt, glm::vec3(0.f, 1.f, 0.f));
-	glm::mat4x4 view = glm::lookAt(cam.position, cam.position + cam.direction, cam.up);
-	glm::mat4x4 mvp = gs.projection * view;
+	
+	// Camera
+	gs.projection = glm::perspective(glm::radians(cam.fov), (float)WIDTH / HEIGHT, gs.near, gs.far);
+	cam.view = glm::lookAt(cam.position, cam.position + cam.direction, cam.up);
+	glm::mat4x4 mvp = gs.projection * cam.view;
 
 	// Compute the MVP matrix from the light's point of view
 	glm::mat4 depthView = glm::lookAt(glm::vec3(gs.lightPos), glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f));
@@ -921,7 +902,10 @@ void render(GLFWwindow* window)
 
 	glm::mat4 depthBiasMVP = gs.biasMatrix * depthMVP;
 
-	
+	// For portal intersection test
+	glm::vec4 la = glm::inverse(prev_cam) * glm::vec4(0.0, 0.0, 0.0, 1.0);
+	glm::vec4 lb = glm::inverse(cam.view) * glm::vec4(0.0, 0.0, 0.0, 1.0);
+
 	// Shadow map
 	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 	glBindFramebuffer(GL_FRAMEBUFFER, gs.framebuffer);
@@ -942,7 +926,7 @@ void render(GLFWwindow* window)
 	model = glm::translate(model, glm::vec3(gs.lightPos.x, gs.lightPos.y, gs.lightPos.z));
 	draw_light(mvp, model);
 
-	// Mirror
+	// Portal 1
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glEnable(GL_STENCIL_TEST);
 	glStencilFunc(GL_ALWAYS, 1, 0xFF); // Set any stencil to 1
@@ -952,35 +936,38 @@ void render(GLFWwindow* window)
 	glClear(GL_STENCIL_BUFFER_BIT); // Clear stencil buffer (0 by default)
 
 	glm::mat4 mat_scale = glm::scale(glm::vec3(1.0f, 1.0f, 0.5f));
-	glm::mat4 mat_rot;
 
-	if (gs.axe == 0)
-		mat_rot = glm::rotate(glm::radians(gs.rot), glm::vec3(1.f, 0.f, 0.f));
-	else if (gs.axe == 1)
-		mat_rot = glm::rotate(glm::radians(gs.rot), glm::vec3(0.f, 1.f, 0.f));
-	else
-		mat_rot = glm::rotate(glm::radians(gs.rot), glm::vec3(0.f, 0.f, 1.f));
+	gs.portal1_model = glm::translate(gs.portal_pos) * glm::rotate(glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)) * mat_scale;
+	gs.portal2_model = glm::translate(gs.portal2_pos) * glm::rotate(glm::radians(-90.f), glm::vec3(1.f, 0.f, 0.f)) * mat_scale;
 
-	glm::mat4 mat_pos = glm::translate(gs.pos);
+	draw_mirror(0, mvp, gs.portal1_model);
 
-	model = mat_pos * mat_rot * glm::rotate(glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)) * mat_scale;
+	if (portal_intersection(la, lb, gs.portal1_model, gs.portal1->vertices_indexed))
+	{
+		glm::vec3 offset((cam.position - gs.portal_pos) * glm::vec3(1.f, 1.f, 0.f));
+		cam.position = gs.portal2_pos + offset;
+	}
+	else if (portal_intersection(la, lb, gs.portal2_model, gs.portal2->vertices_indexed))
+	{
+		glm::vec3 offset((cam.position - gs.portal2_pos) * glm::vec3(1.f, 1.f, 0.f));
+		cam.position = gs.portal_pos + offset;
+	}
 
-	draw_mirror(mvp, model);
-
-	model = glm::translate(-gs.pos) * mat_rot * mat_scale;
-
-	draw_mirror(mvp, model);
-
-	// Stencil scene
-
-	glm::vec3 pos = gs.pos;
+	// Stencil scene 1
+	glm::vec3 pos = gs.portal_pos;
 	pos.y = pos.y * 0.2f;
 	pos.x = pos.x * 0.f;
 	pos.z = pos.z * 2.1f;
+
+	glm::vec3 pos2 = gs.portal2_pos;
+	pos2.y = pos2.y * 0.2f;
+	pos2.x = pos2.x * 0.f;
+	pos2.z = pos2.z * 2.1f;
 	
-	//pos.z = -pos.z;
-	// model = mat_pos * mat_rot * mat_scale * glm::scale(glm::vec3(1.f, 1.f, -1.f));
-	model = glm::translate(pos) * mat_rot * glm::scale(glm::vec3(1.0f, 0.8f, 1.0f)) * glm::scale(glm::vec3(1.f, 1.f, -1.f)); // * glm::rotate(glm::radians(180.f), glm::vec3(0.f, 1.f, 0.f))
+	glm::mat4 model_stencil1 = glm::translate(pos) * glm::scale(glm::vec3(1.0f, 0.8f, 1.0f)) * glm::scale(glm::vec3(1.f, 1.f, -1.f));
+	glm::mat4 model_stencil2 = glm::translate(pos2)  * glm::scale(glm::vec3(1.0f, 0.8f, 1.0f)) * glm::scale(glm::vec3(1.f, 1.f, -1.f));
+
+	model = model_stencil1;
 
 	glStencilFunc(GL_EQUAL, 1, 0xFF); // Pass test if stencil value is 1
 	glStencilMask(0x00); // Don't write anything to stencil buffer
@@ -994,7 +981,7 @@ void render(GLFWwindow* window)
 
 	draw_scene(mvp, depthBiasMVP, model);
 
-	// Stencil Light
+	// Stencil Light 1
 	model = glm::translate(model, glm::vec3(gs.lightPos.x, gs.lightPos.y, gs.lightPos.z));
 	draw_light(mvp, model);
 
@@ -1002,6 +989,50 @@ void render(GLFWwindow* window)
 	glDisable(GL_STENCIL_TEST);
 
 	glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+	// Portal 2
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glEnable(GL_STENCIL_TEST);
+	glStencilFunc(GL_ALWAYS, 1, 0xFF); // Set any stencil to 1
+	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+	glStencilMask(0xFF); // Write to stencil buffer
+	glDepthMask(GL_FALSE); // Don't write to depth buffer
+	glClear(GL_STENCIL_BUFFER_BIT); // Clear stencil buffer (0 by default)
+	
+	draw_mirror(1, mvp, gs.portal2_model);
+
+	// Stencil scene 2
+	model = model_stencil2;
+	glStencilFunc(GL_EQUAL, 1, 0xFF); // Pass test if stencil value is 1
+	glStencilMask(0x00); // Don't write anything to stencil buffer
+	glDepthMask(GL_TRUE); // Write to depth buffer
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, gs.renderedTexture);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	glCullFace(GL_FRONT);
+
+	draw_scene(mvp, depthBiasMVP, model);
+
+	// Stencil Light 2
+	model = glm::translate(model, glm::vec3(gs.lightPos.x, gs.lightPos.y, gs.lightPos.z));
+	draw_light(mvp, model);
+
+	glCullFace(GL_BACK);
+	glDisable(GL_STENCIL_TEST);
+
+	glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+}
+
+void OnFocus(GLFWwindow* window, int iconify)
+{
+	cam.WindowFocused = (iconify == GL_TRUE);
+}
+
+void OnWheelScroll(GLFWwindow* window, double xoffset, double yoffset)
+{
+	cam.ChangeFov(yoffset);
 }
 
 int main(void)
@@ -1061,6 +1092,12 @@ int main(void)
 
 	// Hide cursor
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+
+	GLFWwindowfocusfun OnFocusPointer = *OnFocus;
+	glfwSetWindowFocusCallback(window, OnFocusPointer);
+
+	GLFWscrollfun OnWheelScrollPointer = *OnWheelScroll;
+	glfwSetScrollCallback(window, OnWheelScrollPointer);
 
 	// This is our openGL init function which creates ressources
 	init();
